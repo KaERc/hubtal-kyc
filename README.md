@@ -25,12 +25,14 @@ Delete them and run `migrate` again to reset. The page styling loads Pico CSS fr
 
 ### A two-minute tour
 
-1. Open the link `seed` printed for the *EOR, waiting for your answer* case: the reviewer asked a question about one
-   section. Answer it, then **Send answers back to review**.
-2. Sign in as the reviewer: the case list shows completeness and open requests. Open a case: red-flag answers are
+1. **Answer a reviewer's question.** `seed` prints three numbered links, one per demo case. Open **link 2** (*EOR, question
+   open*). At the top of the page is a box *Question from the reviewer* about a bankruptcy answer. Type a reply, click
+   **Send answer**, then click **Send answers back to review**.
+2. **See it as the reviewer.** Go to <http://127.0.0.1:8000/review/> and sign in. The list shows each case with its
+   completeness and open requests; the case from step 1 is now *In review*. Open any case: answers that need attention are
    at the top, then every answer, documents, notes, requests and the history of status changes.
-3. Start a fresh case on the home page, leave it half-filled and look at the case page: it says exactly what is missing,
-   and **Submit** stays disabled until nothing is.
+3. **See what "incomplete" looks like.** On the home page start a fresh case and leave it half-filled. The case page lists
+   exactly what is missing, and **Submit** stays disabled until nothing is.
 
 ## Architecture
 
@@ -208,11 +210,11 @@ not start from a blank prompt: it works inside a setup that I maintain, and that
 
 - A `CLAUDE.md` that I wrote for my projects folder. Among its rules: plan first and wait for my answer on large tasks;
   verify before reporting success (tests, rendered pages, link checks); mark guesses as guesses; commit in small steps and push
-  only when I ask; keep personal and negotiation notes out of repositories others will read; name its own mistakes and write down
+  only when I ask; keep personal notes out of repositories others will read; name its own mistakes and write down
   the rule that prevents them.
 - Notes it keeps from earlier sessions with me, including lessons from a previous take-home: the README with run instructions
   has to exist from the first commits (I once let it sit as a stub), my branch and commit conventions (`area/topic/name` branches,
-  `--no-ff` merges, English messages with attribution), and my preference for minimal code. The previous take-home's repository
+  `--no-ff` merges, English messages with attribution), and preference for minimal code. The previous take-home's repository
   was the reference for structure and conventions. That is why the history here looks as it does.
 
 **What the agent proposed and I let stand:** the scope for the time box (a thin vertical slice, everything else listed above),

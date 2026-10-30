@@ -1,0 +1,26 @@
+{% extends "kyc/base.html" %}
+{% block title %}Cases{% endblock %}
+{% block content %}
+<h1>Cases</h1>
+<p>
+  <a href="{% url 'kyc:review_list' %}" {% if not status %}aria-current="true"{% endif %}>Active</a>
+  {% for key, label in statuses.items %} · <a href="?status={{ key }}" {% if status == key %}aria-current="true"{% endif %}>{{ label }}</a>{% endfor %}
+</p>
+<table>
+  <thead><tr><th>Case</th><th>Flow</th><th>Status</th><th>Complete</th><th>Open requests</th><th>Updated</th></tr></thead>
+  <tbody>
+  {% for c, prog, open in rows %}
+    <tr>
+      <td><a href="{% url 'kyc:review_detail' c.pk %}">#{{ c.pk }} {{ c.subject }}</a></td>
+      <td>{{ c.flow.title }}</td>
+      <td><span class="badge s-{{ c.status }}">{{ c.status_label }}</span></td>
+      <td>{{ prog.percent }}%</td>
+      <td>{{ open|default:"—" }}</td>
+      <td>{{ c.updated_at|date:"d M H:i" }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="6">No cases here yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -2,6 +2,8 @@ import os
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
+from django.db import transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -9,10 +11,13 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from . import engine, workflow
 from .flows import FLOWS
-from .models import Case, Document, InfoRequest
+from .models import STATUS_LABELS, Case, Document, InfoRequest
 
 # What an upload must start with, per extension; the extension alone proves nothing.
 MAGIC = {'.pdf': b'%PDF', '.jpg': b'\xff\xd8\xff', '.jpeg': b'\xff\xd8\xff', '.png': b'\x89PNG'}
+
+
+reviewer_only = staff_member_required(login_url='kyc:login')
 
 
 def client_ip(request):
@@ -169,3 +174,14 @@ def send(doc):
 
 def download(request, token, pk):
     return send(get_object_or_404(Document, pk=pk, case__token=token))
+
+
+# ---- reviewer side: staff accounts only -------------------------------------
+
+@reviewer_only
+def review_list(request):
+    status = request.GET.get('status', '')
+    cases = Case.objects.prefetch_related('documents', 'info_requests').order_by('-updated_at')
+    cases = cases.filter(status=status) if status in STATUS_LABELS else cases.exclude(status='draft')
+    rows = [(c, engine.case_progress(c), sum(r.open for r in c.info_requests.all())) for c in cases]
+    return render(request, 'kyc/review_list.html', {'rows': rows, 'status': status, 'statuses': STATUS_LABELS})

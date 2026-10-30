@@ -1,3 +1,4 @@
+from django.contrib.auth import views as auth
 from django.urls import path
 
 from . import views
@@ -5,6 +6,9 @@ from . import views
 app_name = 'kyc'
 urlpatterns = [
     path('', views.start, name='start'),
+    path('login/', auth.LoginView.as_view(template_name='kyc/login.html'), name='login'),
+    path('logout/', auth.LogoutView.as_view(next_page='kyc:start'), name='logout'),
+    path('review/', views.review_list, name='review_list'),
     path('c/<str:token>/', views.case_home, name='case'),
     path('c/<str:token>/s/<str:key>/', views.section, name='section'),
     path('c/<str:token>/docs/', views.docs, name='docs'),

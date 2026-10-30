@@ -1,0 +1,12 @@
+{% extends "kyc/base.html" %}
+{% block title %}Reviewer sign-in{% endblock %}
+{% block content %}
+<h1>Reviewer sign-in</h1>
+<form method="post">{% csrf_token %}
+  {% if form.errors %}<p class="flag">Wrong username or password, or the account is not a reviewer account.</p>{% endif %}
+  <label>Username <input name="username" autocomplete="username" required autofocus></label>
+  <label>Password <input type="password" name="password" autocomplete="current-password" required></label>
+  <input type="hidden" name="next" value="{{ next }}">
+  <button type="submit">Sign in</button>
+</form>
+{% endblock %}

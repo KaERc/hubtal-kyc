@@ -1,12 +1,14 @@
 import shutil
 import tempfile
 
+from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import QueryDict
 from django.test import TestCase, override_settings
 
 from . import demo, engine, workflow
 from .flows import FLOWS
-from .models import InfoRequest
+from .models import Case, Document, InfoRequest
 
 MEDIA = tempfile.mkdtemp()
 
@@ -127,3 +129,84 @@ class WorkflowTests(TestCase):
         InfoRequest.objects.create(case=case, message='?')
         self.assertEqual(dict((e, why) for e, _, why in workflow.available(case, 'reviewer'))['approve'],
                          'Every information request needs a reply first.')
+
+
+@override_settings(MEDIA_ROOT=MEDIA)
+class ViewTests(TestCase):
+    def start(self, flow='id-non-eor'):
+        return self.client.post('/', {'flow': flow}).headers['Location'].split('/')[2]
+
+    def upload(self, token, key, name='file.pdf', body=b'%PDF-1.4 x'):
+        self.client.post(f'/c/{token}/docs/', {'key': key, 'file': SimpleUploadedFile(name, body)})
+
+    def test_applicant_to_approval_end_to_end(self):
+        token = self.start()
+        case = Case.objects.get(token=token)
+        case.data = demo.complete_data(case.flow)
+        case.save()
+        self.client.post(f'/c/{token}/submit/')
+        case.refresh_from_db()
+        self.assertEqual(case.status, 'draft')  # documents are still missing
+        self.upload(token, 'passport')
+        self.upload(token, 'lease_or_booking')
+        self.client.post(f'/c/{token}/submit/')
+        case.refresh_from_db()
+        self.assertEqual(case.status, 'submitted')
+
+        User.objects.create_user('rev', password='pw', is_staff=True)
+        self.client.login(username='rev', password='pw')
+        self.assertContains(self.client.get('/review/'), case.subject)
+        self.client.post(f'/review/{case.pk}/do/start_review/')
+        self.client.post(f'/review/{case.pk}/request/', {'section': 'stay', 'message': 'Which city?'})
+        case.refresh_from_db()
+        self.assertEqual(case.status, 'info_requested')
+        self.client.post(f'/c/{token}/submit/')  # cannot send back before answering
+        case.refresh_from_db()
+        self.assertEqual(case.status, 'info_requested')
+        self.client.post(f'/c/{token}/reply/{case.info_requests.get().pk}/', {'reply': 'Bali'})
+        self.client.post(f'/c/{token}/submit/')
+        self.client.post(f'/review/{case.pk}/do/approve/')
+        case.refresh_from_db()
+        self.assertEqual(case.status, 'approved')
+
+    def test_review_pages_need_a_staff_account(self):
+        case = demo.make_case('id-non-eor')
+        urls = ['/review/', f'/review/{case.pk}/', f'/review/file/{case.documents.first().pk}/']
+        for url in urls:
+            r = self.client.get(url)
+            self.assertEqual((r.status_code, '/login/' in r['Location']), (302, True), url)
+        User.objects.create_user('plain', password='pw')  # signed in but not staff
+        self.client.login(username='plain', password='pw')
+        for url in urls:
+            self.assertEqual(self.client.get(url).status_code, 302, url)
+        self.assertEqual(self.client.post(f'/review/{case.pk}/do/reject/').status_code, 302)
+        case.refresh_from_db()
+        self.assertEqual(case.status, 'draft')
+
+    def test_case_is_locked_while_it_is_with_the_reviewer(self):
+        case = demo.make_case('id-non-eor')
+        workflow.fire(case, 'submit', 'applicant', 'a')
+        self.client.post(f'/c/{case.token}/s/applicant/', {'full_name': 'Changed'})
+        self.client.post(f'/c/{case.token}/docs/{case.documents.first().pk}/delete/')
+        case.refresh_from_db()
+        self.assertNotEqual(case.data['applicant']['full_name'], 'Changed')
+        self.assertEqual(case.documents.count(), 2)
+
+    def test_uploads_are_checked_by_content_and_type(self):
+        token = self.start()
+        self.upload(token, 'passport', 'fake.pdf', b'<script>alert(1)</script>')
+        self.upload(token, 'passport', 'program.exe', b'MZ')
+        self.upload(token, 'not-a-document', 'ok.pdf')
+        self.assertEqual(Document.objects.count(), 0)
+        self.upload(token, 'passport', 'ok.pdf')
+        self.assertEqual(Document.objects.count(), 1)
+
+    def test_documents_are_only_served_to_their_own_case(self):
+        mine, other = demo.make_case('id-non-eor'), demo.make_case('id-non-eor')
+        doc = other.documents.first()
+        self.assertEqual(self.client.get(f'/c/{mine.token}/file/{doc.pk}/').status_code, 404)
+        r = self.client.get(f'/c/{other.token}/file/{doc.pk}/')
+        self.assertEqual((r.status_code, 'attachment' in r['Content-Disposition']), (200, True))
+
+    def test_unknown_token_is_not_found(self):
+        self.assertEqual(self.client.get('/c/nope/').status_code, 404)

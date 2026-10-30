@@ -23,6 +23,12 @@
 <header class="container">
   <nav>
     <ul><li><a href="{% url 'kyc:start' %}"><strong>KYC cases</strong></a></li></ul>
+    <ul>
+      <li><a href="{% url 'kyc:review_list' %}">Reviewer</a></li>
+      {% if user.is_staff %}
+      <li><form method="post" action="{% url 'kyc:logout' %}">{% csrf_token %}<button class="outline secondary" type="submit">Sign out</button></form></li>
+      {% endif %}
+    </ul>
   </nav>
 </header>
 <main class="container">

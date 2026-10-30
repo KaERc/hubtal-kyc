@@ -2,6 +2,8 @@ import os
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
+from django.db import transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -9,10 +11,13 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from . import engine, workflow
 from .flows import FLOWS
-from .models import Case, Document, InfoRequest
+from .models import STATUS_LABELS, Case, Document, InfoRequest, ReviewNote
 
 # What an upload must start with, per extension; the extension alone proves nothing.
 MAGIC = {'.pdf': b'%PDF', '.jpg': b'\xff\xd8\xff', '.jpeg': b'\xff\xd8\xff', '.png': b'\x89PNG'}
+
+
+reviewer_only = staff_member_required(login_url='kyc:login')
 
 
 def client_ip(request):
@@ -169,3 +174,82 @@ def send(doc):
 
 def download(request, token, pk):
     return send(get_object_or_404(Document, pk=pk, case__token=token))
+
+
+# ---- reviewer side: staff accounts only -------------------------------------
+
+@reviewer_only
+def review_list(request):
+    status = request.GET.get('status', '')
+    cases = Case.objects.prefetch_related('documents', 'info_requests').order_by('-updated_at')
+    cases = cases.filter(status=status) if status in STATUS_LABELS else cases.exclude(status='draft')
+    rows = [(c, engine.case_progress(c), sum(r.open for r in c.info_requests.all())) for c in cases]
+    return render(request, 'kyc/review_list.html', {'rows': rows, 'status': status, 'statuses': STATUS_LABELS})
+
+
+@reviewer_only
+def review_detail(request, pk):
+    case = get_object_or_404(Case, pk=pk)
+    flow = case.flow
+    shown = engine.answers(case)
+    labels = {d.key: d.label for d in flow.docs}
+    return render(request, 'kyc/review_detail.html', {
+        'case': case,
+        'prog': engine.case_progress(case),
+        'answers': shown,
+        'flags': [(s.title, label, text) for s, rows in shown for entry in rows for label, text, hot in entry if hot],
+        'documents': [(labels.get(d.key, d.key), d) for d in case.documents.all()],
+        'requests': case.info_requests.all(),
+        'notes': case.notes.select_related('author'),
+        'events': case.events.all(),
+        # asking for information is its own form below, which also fires request_info
+        'actions': [a for a in workflow.available(case, 'reviewer') if a[0] != 'request_info'],
+        'can_ask': case.status in ('submitted', 'in_review', 'info_requested'),
+        'sections': flow.sections,
+    })
+
+
+@reviewer_only
+@require_POST
+def review_note(request, pk):
+    case = get_object_or_404(Case, pk=pk)
+    text = request.POST.get('text', '').strip()
+    if text:
+        ReviewNote.objects.create(case=case, author=request.user, text=text[:engine.MAX_TEXT])
+    return redirect('kyc:review_detail', pk=pk)
+
+
+@reviewer_only
+@require_POST
+def review_request(request, pk):
+    """Ask the applicant for something. The first request of a round also moves the case to info_requested."""
+    case = get_object_or_404(Case, pk=pk)
+    message = request.POST.get('message', '').strip()
+    section = request.POST.get('section', '')
+    if section not in {s.key for s in case.flow.sections}:
+        section = ''
+    if not message or case.status not in ('submitted', 'in_review', 'info_requested'):
+        messages.error(request, 'Write what you need from the applicant.')
+    else:
+        with transaction.atomic():
+            InfoRequest.objects.create(case=case, section=section, message=message[:engine.MAX_TEXT])
+            if case.status != 'info_requested':
+                workflow.fire(case, 'request_info', 'reviewer', request.user.get_username(), client_ip(request))
+        messages.success(request, 'The applicant can see the request and edit the case again.')
+    return redirect('kyc:review_detail', pk=pk)
+
+
+@reviewer_only
+@require_POST
+def review_event(request, pk, event):
+    case = get_object_or_404(Case, pk=pk)
+    try:
+        workflow.fire(case, event, 'reviewer', request.user.get_username(), client_ip(request))
+    except workflow.TransitionError as e:
+        messages.error(request, str(e))
+    return redirect('kyc:review_detail', pk=pk)
+
+
+@reviewer_only
+def review_download(request, pk):
+    return send(get_object_or_404(Document, pk=pk))

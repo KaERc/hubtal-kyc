@@ -185,7 +185,32 @@ Within the time box I kept to one coherent slice: both flows, applicant and revi
 - **Automated browser tests.** The show/hide JavaScript was checked by hand in a browser, not by a test.
 - **Deployment, CI, Docker.** It runs locally with three commands.
 
+## Shortcuts with a known ceiling
+
+Each shortcut carries a `ponytail:` comment in the code, one comment per row. This table is that ledger. What was left
+out of scope entirely is in the previous section.
+
+| Where | Shortcut | Ceiling | Revisit when |
+|---|---|---|---|
+| `kyc/models.py` `Case.data` | Answers as one JSON document | Breaks first normal form (nested lists such as owners); no types, constraints or indexes, and the dependencies between answers are invisible to the database | Screening or reporting must search across cases: normalise persons, owners and documents into typed tables, or PostgreSQL `JSONB` with indexes |
+| `kyc/models.py` `Case.token` | The link is the only credential, one per case | Anyone with the link has the case; employer and candidate of an EOR case share it | Before real applicants use it: emailed, expiring links per party |
+| `kyc/models.py` `Case.flow_version` | Only the version string is stored | The old flow definition and the declaration wording are not archived | Before production: snapshot answers and wording at submit |
+| `kyc/models.py` `Document` | Files on local disk | Unencrypted, not virus-scanned; Django reads the whole upload before the 10 MB check | Private object storage with scanning, size limit at the proxy |
+| `kyc/views.py` `start` | Public, unthrottled case creation | Anyone can create cases | On the internet: cases created by operations, or a rate limit and a captcha |
+| `kyc/views.py` `client_ip` | The socket address as the client IP | Behind a proxy it is the proxy's address | Read a trusted `X-Forwarded-For` |
+| `kyc/views.py` `review_list` | No pagination or search | All cases of a status are listed and progress is computed per case | The list outgrows a screen or two |
+| `kyc/workflow.py` `incomplete` | Every guard recomputes the progress | A few queries per page load | Profiling shows it: cache on the case for the request |
+| `kyc/workflow.py` `fire` | No notifications | Both sides learn of a change only by opening their page | Send mail or enqueue a screening job from `fire` |
+| `kyc/urls.py` | No login throttling | Unlimited password guesses | `django-axes`, or a rate limit in front |
+| `config/settings.py` database | SQLite | One file, one process | Deployment: PostgreSQL |
+| `config/settings.py` environment | Settings read from the environment by hand | No typing or validation (`KYC_DEBUG` is on only for the string `1`) | More settings appear: `pydantic-settings` |
+| `kyc/engine.py` `PHONE` | A loose phone pattern, countries as free text | Accepts numbers nobody can call; "Estonia" and "EE" are different answers | Data quality starts to matter: `phonenumbers` and a country list |
+| `kyc/templates/kyc/base.html` | Stylesheet from a CDN | The first load needs internet; no integrity hash | Production: vendor the file or build the CSS, add an integrity hash |
+
 ## What I would change before production
+
+The ledger above shows where each shortcut sits in the code. This list is the same work in the order I would do it, plus what
+is not in the code at all (operations, tests, deployment).
 
 1. **The link is the credential.** Replace it with emailed, expiring links per party (or accounts), and let operations
    create cases instead of leaving the start page public. Today anyone can start cases.

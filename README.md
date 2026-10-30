@@ -181,7 +181,8 @@ Within the time box I kept to one coherent slice: both flows, applicant and revi
    cannot both succeed.
 5. **Reviewer access.** Real accounts with roles, SSO or two-factor sign-in, login throttling (there is none), an access log
    for who looked at personal data.
-6. **Deployment settings.** `KYC_SECRET_KEY`, `KYC_DEBUG=0`, `KYC_ALLOWED_HOSTS`, HTTPS with secure cookies, a trusted proxy
+6. **Deployment settings.** `KYC_SECRET_KEY`, `KYC_DEBUG=0` (the app refuses to start with `KYC_DEBUG=0` and the development
+   key), `KYC_ALLOWED_HOSTS`, HTTPS with secure cookies, a trusted proxy
    header for the client IP (it currently reads the socket address), and an upload size limit at the proxy: Django receives
    the whole body before the 10 MB check runs.
 7. **Operations.** Error tracking, structured logs without personal data, backups, CI with the tests and a browser test of

@@ -312,3 +312,15 @@ class ReviewFixTests(TestCase):
         doc = case.documents.first()
         doc.file.storage.delete(doc.file.name)
         self.assertEqual(self.client.get(f'/c/{case.token}/file/{doc.pk}/').status_code, 404)
+
+    def test_beneficial_owners_can_be_added_edited_and_removed(self):
+        case = demo.make_case('id-eor', complete=False)
+        url = f'/c/{case.token}/s/ubos/'
+        names = lambda: [e.get('full_name') for e in Case.objects.get(pk=case.pk).data['ubos']]
+        self.client.post(url, {'n': '0', 'action': 'add'})
+        self.client.post(url, {'n': '1', 'action': 'add', '0-full_name': 'A', '0-ownership_pct': '60'})
+        self.assertEqual(names(), ['A', None])
+        self.client.post(url, {'n': '2', '0-full_name': 'A', '0-ownership_pct': '60', '1-full_name': 'B', '1-ownership_pct': '40'})
+        self.assertEqual(names(), ['A', 'B'])
+        self.client.post(url, {'n': '2', 'action': 'remove-0', '0-full_name': 'A', '1-full_name': 'B', '1-ownership_pct': '40'})
+        self.assertEqual(names(), ['B'])

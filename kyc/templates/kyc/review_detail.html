@@ -1,0 +1,95 @@
+{% extends "kyc/base.html" %}
+{% block title %}Case #{{ case.pk }}{% endblock %}
+{% block content %}
+<p><a href="{% url 'kyc:review_list' %}">← All cases</a></p>
+<hgroup>
+  <h1>#{{ case.pk }} {{ case.subject }} <span class="badge s-{{ case.status }}">{{ case.status_label }}</span></h1>
+  <p>{{ case.flow.title }} · form version {{ case.flow_version }} · created {{ case.created_at|date:"d M Y H:i" }}
+     {% if case.submitted_at %}· submitted {{ case.submitted_at|date:"d M Y H:i" }}{% endif %}</p>
+</hgroup>
+
+<progress value="{{ prog.done }}" max="{{ prog.total }}"></progress>
+<p>{{ prog.done }} of {{ prog.total }} required items done ({{ prog.percent }}%).</p>
+
+{% if flags %}
+<article>
+  <header class="flag">Needs attention</header>
+  <ul>{% for section, label, text in flags %}<li>{{ section }} — {{ label }}: <strong class="flag">{{ text }}</strong></li>{% endfor %}</ul>
+</article>
+{% endif %}
+{% if prog.missing %}
+<details><summary>Missing information ({{ prog.missing|length }})</summary>
+  <ul>{% for m in prog.missing %}<li>{{ m }}</li>{% endfor %}</ul>
+</details>
+{% endif %}
+
+{% if actions %}
+<h2>Decision</h2>
+<div class="grid">
+{% for event, t, why in actions %}
+  <form method="post" action="{% url 'kyc:review_event' case.pk event %}">{% csrf_token %}
+    <button type="submit" {% if why %}disabled{% endif %} {% if event == 'reject' %}class="secondary"{% endif %}>{{ t.label }}</button>
+    {% if why %}<small class="flag">{{ why }}</small>{% endif %}
+  </form>
+{% endfor %}
+</div>
+{% endif %}
+
+<h2>Answers</h2>
+{% for s, rows in answers %}
+<article>
+  <header><strong>{{ s.title }}</strong>{% if s.party %} <small>({{ s.party }})</small>{% endif %}</header>
+  {% for entry in rows %}
+    {% if s.repeat %}<h6>Entry {{ forloop.counter }}</h6>{% endif %}
+    <dl class="answers">
+      {% for label, text, hot in entry %}<dt>{{ label }}</dt><dd {% if hot %}class="flag"{% endif %}>{{ text }}</dd>{% endfor %}
+    </dl>
+  {% empty %}<p>—</p>{% endfor %}
+</article>
+{% endfor %}
+
+<h2>Documents</h2>
+<ul>
+  {% for label, d in documents %}<li>{{ label }}: <a href="{% url 'kyc:review_download' d.pk %}">{{ d.name }}</a> <small>({{ d.uploaded_at|date:"d M H:i" }})</small></li>
+  {% empty %}<li>Nothing uploaded.</li>{% endfor %}
+</ul>
+
+<h2>Requests to the applicant</h2>
+{% for r in requests %}
+<article>
+  <p><small>{{ r.created_at|date:"d M H:i" }}{% if r.section_title %} · about {{ r.section_title }}{% endif %}</small></p>
+  <p>{{ r.message|linebreaksbr }}</p>
+  {% if r.open %}<p><em>Waiting for the applicant.</em></p>{% else %}<p><strong>Reply</strong> <small>({{ r.answered_at|date:"d M H:i" }})</small>: {{ r.reply|linebreaksbr }}</p>{% endif %}
+</article>
+{% endfor %}
+{% if can_ask %}
+<form method="post" action="{% url 'kyc:review_request' case.pk %}">{% csrf_token %}
+  <label>About
+    <select name="section">
+      <option value="">The case in general</option>
+      {% for s in sections %}<option value="{{ s.key }}">{{ s.title }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>What do you need? <textarea name="message" rows="3" required></textarea></label>
+  <button type="submit" class="secondary">Request information</button>
+  <small>The applicant sees this and can edit the case again.</small>
+</form>
+{% endif %}
+
+<h2>Internal notes</h2>
+{% for n in notes %}<article><small>{{ n.author.get_username }} · {{ n.created_at|date:"d M H:i" }}</small><p>{{ n.text|linebreaksbr }}</p></article>{% endfor %}
+<form method="post" action="{% url 'kyc:review_note' case.pk %}">{% csrf_token %}
+  <label>Note (never shown to the applicant) <textarea name="text" rows="3" required></textarea></label>
+  <button type="submit" class="secondary">Add note</button>
+</form>
+
+<h2>History</h2>
+<table>
+  <thead><tr><th>When</th><th>Event</th><th>From → to</th><th>By</th><th>IP</th></tr></thead>
+  <tbody>
+  {% for e in events %}
+    <tr><td>{{ e.at|date:"d M Y H:i" }}</td><td>{{ e.event }}</td><td>{{ e.from_status }} → {{ e.to_status }}</td><td>{{ e.actor }}</td><td>{{ e.ip|default:"—" }}</td></tr>
+  {% empty %}<tr><td colspan="5">No changes yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}

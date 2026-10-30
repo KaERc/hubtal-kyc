@@ -14,6 +14,7 @@ from django.core.validators import validate_email
 
 PHONE = re.compile(r'^\+?[0-9 ()\-]{6,20}$')
 MAX_TEXT = 4000
+MAX_NUMBER = 10**12  # int(Decimal('1e5000')) would build a number JSON cannot store
 
 
 def blank(value):
@@ -93,6 +94,8 @@ def clean(f, raw):
             return None, 'Enter a number.'
         if not n.is_finite():
             return None, 'Enter a number.'
+        if abs(n) > MAX_NUMBER:
+            return None, 'That number is too large.'
         if (f.min is not None and n < f.min) or (f.max is not None and n > f.max):
             return None, f'Enter a number between {f.min if f.min is not None else "−∞"} and {f.max if f.max is not None else "∞"}.'
         return (int(n) if n == n.to_integral() else float(n)), None

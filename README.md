@@ -3,7 +3,7 @@
 A small web workflow that replaces the form-and-spreadsheet process for **Indonesia visa-sponsorship KYC**, for both
 the **EOR** and the **non-EOR** variant. It is a take-home prototype: a coherent working slice, not a finished product.
 The process comes from the supplied reference form, simplified where that made it better (see
-[Where I departed from the form](#where-i-departed-from-the-form)).
+[Where I departed from the form](README.md#where-i-departed-from-the-form)).
 
 ## Quick start
 
@@ -181,8 +181,8 @@ Within the time box I kept to one coherent slice: both flows, applicant and revi
    later edit or a new flow version can never change what was agreed.
 4. **Database and concurrency.** PostgreSQL. Saving a section already re-reads the case under a row lock (and SQLite is set to
    begin transactions immediately, so the lock holds there too), because answers are one JSON document and two people may fill
-   different sections at once. `workflow.fire` is not locked yet: two reviewers clicking at once could both succeed. There is
-   no test for the race itself.
+   different sections at once. `workflow.fire` locks the case too and judges the move on the current status. The locking itself
+   is not covered by a concurrent test; the tests check the stale-status case, not true parallelism.
 5. **Reviewer access.** Real accounts with roles, SSO or two-factor sign-in, login throttling (there is none), an access log
    for who looked at personal data.
 6. **Deployment settings.** `KYC_SECRET_KEY`, `KYC_DEBUG=0` (the app refuses to start with `KYC_DEBUG=0` and the development

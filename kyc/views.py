@@ -53,6 +53,9 @@ def case_home(request, token):
 def submit(request, token):
     """One button, two events: the first submission, and sending answers back after a reviewer's request."""
     case = case_by_token(token)
+    if case.status not in ('draft', 'info_requested'):  # a double click: the first one already went through
+        messages.info(request, 'Already sent to the reviewer.')
+        return redirect('kyc:case', token=token)
     event = 'respond' if case.status == 'info_requested' else 'submit'
     try:
         workflow.fire(case, event, 'applicant', 'applicant', client_ip(request))
@@ -69,7 +72,9 @@ def reply(request, token, pk):
     text = request.POST.get('reply', '').strip()
     if case.status != 'info_requested' or not ask.open:
         messages.error(request, 'This question is no longer open.')
-    elif text:
+    elif not text:
+        messages.error(request, 'Write your answer first.')
+    else:
         ask.reply, ask.answered_at = text[:engine.MAX_TEXT], timezone.now()
         ask.save()
         messages.success(request, 'Answer saved. Update your details if needed, then send everything back.')
@@ -96,10 +101,12 @@ def section(request, token, key):
             return redirect('kyc:case', token=token)
         action = request.POST.get('action', '')
         if s.repeat:
-            try:
-                n = min(int(request.POST.get('n', 0)), 50)
-            except ValueError:
-                n = 0
+            if request.POST.get('n') != str(len(engine.entries(s, case.data))):
+                # The form was drawn from an older copy (another window or tab changed the list); saving it
+                # would silently drop or resurrect entries.
+                messages.error(request, 'This list was changed in another window. Reload the page and try again.')
+                return redirect('kyc:section', token=token, key=key)
+            n = len(engine.entries(s, case.data))
             parsed = [engine.parse_entry(s, request.POST, f'{i}-') for i in range(n)]
             entries, errs = [v for v, _ in parsed], [e for _, e in parsed]
             if action == 'add':
@@ -154,6 +161,8 @@ def docs(request, token):
             messages.error(request, 'This case is locked while it is with the reviewer.')
         elif not doc or not up:
             messages.error(request, 'Choose a file to upload.')
+        elif case.documents.count() >= settings.MAX_FILES_PER_CASE:
+            messages.error(request, 'Too many files on this case. Remove one before uploading another.')
         elif error := upload_error(up):
             messages.error(request, error)
         else:
@@ -178,7 +187,10 @@ def doc_delete(request, token, pk):
 
 def send(doc):
     """Always as an attachment: an uploaded file is never rendered by the browser in our origin."""
-    return FileResponse(doc.file.open('rb'), as_attachment=True, filename=doc.name)
+    try:
+        return FileResponse(doc.file.open('rb'), as_attachment=True, filename=doc.name)
+    except FileNotFoundError:
+        raise Http404('The file is no longer in storage.')
 
 
 def download(request, token, pk):

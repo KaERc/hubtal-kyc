@@ -9,7 +9,7 @@ from django.test import TestCase, override_settings
 from . import demo, engine, workflow
 from .flows import FLOWS
 from .flows.spec import Doc, Field, Flow, Section
-from .models import Case, Document, InfoRequest
+from .models import Case, Document, InfoRequest, ReviewNote
 
 MEDIA = tempfile.mkdtemp()
 
@@ -241,3 +241,74 @@ class FlowDefinitionTests(TestCase):
         for name, changes in cases.items():
             with self.subTest(name), self.assertRaises(ValueError):
                 self.flow(**changes)
+
+
+@override_settings(MEDIA_ROOT=MEDIA)
+class ReviewFixTests(TestCase):
+    """Regressions for the problems the code review found."""
+
+    def test_a_huge_number_is_a_field_error_not_a_crash(self):
+        s = section('id-eor', 'employer')
+        values, errors = engine.parse_entry(s, post(employees='1e5000'))
+        self.assertEqual((values, set(errors)), ({}, {'employees'}))
+        case = demo.make_case('id-eor', complete=False)
+        r = self.client.post(f'/c/{case.token}/s/employer/', {'employees': '1e5000'})
+        self.assertEqual(r.status_code, 200)
+
+    def test_a_stale_repeat_list_is_refused_not_applied(self):
+        case = demo.make_case('id-eor')
+        before = case.data['ubos']
+        url = f'/c/{case.token}/s/ubos/'
+        self.client.post(url, {'n': '1', '0-full_name': 'Only one'})  # the form believed there was one entry
+        self.client.post(url, {'n': '-1'})
+        case.refresh_from_db()
+        self.assertEqual(case.data['ubos'], before)
+
+    def test_a_stale_status_cannot_be_acted_on(self):
+        case = demo.make_case('id-non-eor')
+        workflow.fire(case, 'submit', 'applicant', 'a')
+        workflow.fire(case, 'start_review', 'reviewer', 'r')
+        first, second = Case.objects.get(pk=case.pk), Case.objects.get(pk=case.pk)
+        workflow.fire(first, 'approve', 'reviewer', 'r1')
+        with self.assertRaises(workflow.TransitionError):
+            workflow.fire(second, 'approve', 'reviewer', 'r2')  # second still believes in_review
+        self.assertEqual(case.events.filter(event='approve').count(), 1)
+
+    def test_rejecting_needs_a_reason(self):
+        case = demo.make_case('id-non-eor')
+        workflow.fire(case, 'submit', 'applicant', 'a')
+        workflow.fire(case, 'start_review', 'reviewer', 'r')
+        with self.assertRaises(workflow.TransitionError):
+            workflow.fire(case, 'reject', 'reviewer', 'r')
+        ReviewNote.objects.create(case=case, author=User.objects.create_user('rev'), text='Sanctions hit')
+        workflow.fire(case, 'reject', 'reviewer', 'r')
+        self.assertEqual(case.status, 'rejected')
+
+    def test_double_submit_is_one_submission(self):
+        case = demo.make_case('id-non-eor')
+        for _ in range(2):
+            self.client.post(f'/c/{case.token}/submit/')
+        self.assertEqual(case.events.filter(event='submit').count(), 1)
+
+    def test_empty_reply_keeps_the_request_open(self):
+        case = demo.make_case('id-non-eor')
+        workflow.fire(case, 'submit', 'applicant', 'a')
+        workflow.fire(case, 'start_review', 'reviewer', 'r')
+        ask = InfoRequest.objects.create(case=case, message='?')
+        workflow.fire(case, 'request_info', 'reviewer', 'r')
+        self.client.post(f'/c/{case.token}/reply/{ask.pk}/', {'reply': '   '})
+        ask.refresh_from_db()
+        self.assertTrue(ask.open)
+
+    @override_settings(MAX_FILES_PER_CASE=1)
+    def test_the_number_of_files_per_case_is_capped(self):
+        case = demo.make_case('id-non-eor', complete=False)
+        for name in ('a.pdf', 'b.pdf'):
+            self.client.post(f'/c/{case.token}/docs/', {'key': 'passport', 'file': SimpleUploadedFile(name, b'%PDF-1.4 x')})
+        self.assertEqual(case.documents.count(), 1)
+
+    def test_a_missing_file_is_a_404_not_a_crash(self):
+        case = demo.make_case('id-non-eor')
+        doc = case.documents.first()
+        doc.file.storage.delete(doc.file.name)
+        self.assertEqual(self.client.get(f'/c/{case.token}/file/{doc.pk}/').status_code, 404)

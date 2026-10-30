@@ -338,3 +338,11 @@ class CachingTests(TestCase):
                 f'/c/{case.token}/file/{case.documents.first().pk}/', '/review/', f'/review/{case.pk}/']
         for url in urls:
             self.assertIn('no-store', self.client.get(url)['Cache-Control'], url)
+
+
+    def test_an_uploaded_file_is_listed_once_and_the_picker_does_not_linger(self):
+        case = demo.make_case('id-non-eor')
+        case.status = 'draft'
+        html = self.client.get(f'/c/{case.token}/docs/').content.decode()
+        self.assertEqual(html.count('>passport.pdf</a>'), 1)
+        self.assertIn('onchange="this.form.submit()"', html)  # choosing a file uploads it; no "No file chosen" state

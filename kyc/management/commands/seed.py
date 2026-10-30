@@ -45,5 +45,10 @@ class Command(BaseCommand):
         c.data['employer']['company_name'] = 'Example Robotics Ltd'
         c.save()
 
-        for case, who in ((a, 'applicant, submitted'), (b, 'applicant, waiting for your answer'), (c, 'applicant, just started')):
-            self.stdout.write(f'  {case.flow_key:10} {who:38} http://127.0.0.1:8000/c/{case.token}/')
+        self.stdout.write('Three demo cases. Each link is the applicant\'s private page for one case:')
+        for number, (case, what, todo) in enumerate((
+            (a, 'non-EOR, submitted', 'nothing left for the applicant; look at it from the reviewer side'),
+            (b, 'EOR, question open', 'the reviewer asked something: open this link and answer it'),
+            (c, 'EOR, just started', 'only the first section is filled in: continue it'),
+        ), 1):
+            self.stdout.write(f'  {number}. {what:20} {todo}\n     http://127.0.0.1:8000/c/{case.token}/')

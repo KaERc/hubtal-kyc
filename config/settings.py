@@ -125,6 +125,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # kyc.views.download (token or reviewer login), never as public /media/ URLs.
 MEDIA_ROOT = BASE_DIR / 'media'
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_FILES_PER_CASE = 20
 
 LOGIN_URL = 'kyc:login'
 LOGIN_REDIRECT_URL = 'kyc:review_list'

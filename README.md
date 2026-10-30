@@ -201,21 +201,41 @@ the pages end to end over HTTP (applicant to approval, access control, locking, 
 ## How AI was used
 
 I built this with **Claude Code** (Anthropic's coding agent, model Claude Sonnet 5.5) and its *ponytail* skill, which pushes
-towards the smallest solution that works. The agent wrote nearly all of the code, tests, templates and this README. I gave it the brief and the
-reference form, read its plan, told it to go ahead, and steered along the way.
+towards the smallest solution that works. The agent wrote nearly all of the code, tests, templates and this README. It did
+not start from a blank prompt: it works inside a setup that I maintain, and that setup shaped the result as much as the brief did.
+
+**The context I gave it**
+
+- A `CLAUDE.md` that I wrote for my projects folder. Among its rules: plan first and wait for my answer on large tasks;
+  verify before reporting success (tests, rendered pages, link checks); mark guesses as guesses; commit in small steps and push
+  only when I ask; keep personal and negotiation notes out of repositories others will read; name its own mistakes and write down
+  the rule that prevents them.
+- Notes it keeps from earlier sessions with me, including lessons from a previous take-home: the README with run instructions
+  has to exist from the first commits (I once let it sit as a stub), my branch and commit conventions (`area/topic/name` branches,
+  `--no-ff` merges, English messages with attribution), and my preference for minimal code. The previous take-home's repository
+  was the reference for structure and conventions. That is why the history here looks as it does.
 
 **What the agent proposed and I let stand:** the scope for the time box (a thin vertical slice, everything else listed above),
 Django as the stack, and the data-driven design with one engine and a flow definition per variant.
 
-**Where I steered:** I asked whether the allowed status changes should be an explicit state machine rather than a list of
-allowed statuses; the agent answered with an event-based table, without a library, and I did not push for one. I also
-required small commits on topic branches, which is why the history reads as it does.
+**Where I steered or corrected it**
 
-**Checks run during the build, by the agent at my direction:**
+- I asked whether the allowed status changes should be an explicit state machine rather than a list of allowed statuses; it
+  answered with an event-based table, without a library, and I did not push for one.
+- The first version of the history was one large commit. I reminded it of my rule and it redid the history as small commits on
+  topic branches.
+- It cited a rule from another of my projects in a review finding and presented it as mine for this one; I questioned it, it
+  admitted the mix-up, and the settings stayed as they are.
+- Nothing is pushed until I have read it myself.
 
-- Tests were written with the code, and two of them were verified by breaking the code on purpose and watching them fail
-  (zero percent counted as "not answered"; the reviewer-only guard removed from the case list).
+**Checks run during the build**
+
+- Tests were written with the code. Two of them were verified by breaking the code on purpose and watching them fail (zero percent
+  counted as "not answered"; the reviewer-only guard removed from the case list).
 - Both flows load and every page of both renders; the applicant and reviewer paths were walked in a browser, including the
-  conditional fields and the red-flag view.
+  conditional fields and the red-flag view. The commands in this README were run from a fresh clone.
+- An independent code-review pass found 10 issues. Eight were fixed with regression tests (for example a huge number crashing a
+  save, two reviewers acting on the same case at once, a stale list silently dropping entries). Two were left on purpose: the
+  progress being recomputed in several guards, and reading three settings from the environment by hand.
 - A claim in this README that turned out wrong when re-read against the form (which questions the EOR form asks twice) was
   corrected, and the "drop in a new flow" claim was tested with a throwaway Singapore module.

@@ -11,9 +11,11 @@ Prerequisite: [uv](https://docs.astral.sh/uv/) (it installs Python 3.12 and Djan
 
 ```bash
 uv run python manage.py migrate
-uv run python manage.py seed          # demo reviewer account + three demo cases (prints the login and the case links)
+uv run python manage.py seed
 uv run python manage.py runserver
 ```
+
+`seed` creates the demo reviewer account and three demo cases, and prints the login and the case links.
 
 - Applicant side: <http://127.0.0.1:8000/> — pick a flow, fill in the sections, upload documents, submit.
 - Reviewer side: <http://127.0.0.1:8000/review/> — sign in with the demo account that `seed` prints
@@ -275,7 +277,7 @@ Django as the stack, and the data-driven design with one engine and a flow defin
 decision of mine, and I re-checked every point where I had told it what I wanted against what it delivered.
 
 **Bugs I found by hand.** The tests and the agent's own browser walkthrough were green when I found these by using the app.
-All three are about the browser, not the server, which is why a test client over HTTP could not see them.
+The first three are about the browser, not the server, which is why a test client over HTTP could not see them.
 
 1. *Back showed a stale page.* Pages carried no cache headers, so after an upload the browser showed its saved copy of the
    list. Fixed with `Cache-Control: no-store` on every response (one middleware). A test checks the header on every page type.
@@ -285,10 +287,14 @@ All three are about the browser, not the server, which is why a test client over
 3. *Back needed many presses.* Every save, upload and removal is a POST followed by a redirect, and each one added a history entry
    for the same page. Fixed by posting forms with `fetch` and replacing the current entry. Checked in a real browser by the agent
    (a scripted run, not an automated test): three uploads left the history length unchanged and one Back returned to the previous page.
+4. *The quick start did not run in zsh.* The `seed` line had a trailing `# comment`. Interactive zsh (the macOS default) does not
+   treat `#` as a comment, read the parentheses as a glob pattern and stopped with `unknown file attribute`, so `seed` never ran
+   and printed nothing. Fixed by taking the comment out of the command block. The commands had been run from a fresh clone before,
+   but one at a time, not pasted as a block the way a reader does.
 
 While checking the third fix the agent broke the Add button with it (a button named `action` shadows `form.action`, so the post went
-to a 404 address); that was found the same way, by running it in a browser, and fixed. None of these four is covered by a test of the
-behaviour itself, only by checks of the markup and headers; a browser-level test would have caught all of them.
+to a 404 address); that was found the same way, by running it in a browser, and fixed. None of the browser bugs above, that one included, is covered
+by a test of the behaviour itself, only by checks of the markup and headers; a browser-level test would have caught all of them.
 
 **Checks run during the build**
 

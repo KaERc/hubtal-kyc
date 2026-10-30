@@ -73,6 +73,10 @@ class InfoRequest(models.Model):
     def open(self):
         return self.answered_at is None
 
+    @property
+    def section_title(self):
+        return next((s.title for s in self.case.flow.sections if s.key == self.section), '')
+
 
 class ReviewNote(models.Model):
     """Internal only: never shown to the applicant."""

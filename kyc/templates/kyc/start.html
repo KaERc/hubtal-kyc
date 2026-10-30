@@ -7,7 +7,7 @@
   <article>
     <header><strong>{{ flow.title }}</strong></header>
     <p>{{ flow.sections|length }} sections, {{ flow.docs|length }} documents.</p>
-    <form method="post">{% csrf_token %}
+    <form method="post" data-plain>{% csrf_token %}
       <input type="hidden" name="flow" value="{{ flow.key }}">
       <button type="submit">Start this case</button>
     </form>

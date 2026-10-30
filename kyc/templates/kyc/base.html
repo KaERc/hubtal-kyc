@@ -19,6 +19,37 @@
     dl.answers dd { margin: 0; }
     td form, td p { margin: 0; }
   </style>
+  <script>
+    // A form post is answered with a redirect, often to the page we are already on. Done natively, every save,
+    // upload or removal adds a history entry and Back needs one press per action. Post with fetch instead,
+    // show the answer in place and replace the current entry. Without JavaScript the native post still works.
+    // ponytail: the whole body is swapped, so focus and the open state of <details> are lost, and it needs
+    // FormData(form, submitter) (browsers from 2023), otherwise the native post runs; htmx would do it properly.
+    document.addEventListener('submit', async (e) => {
+      const form = e.target;
+      // Read attributes, not form.method / form.action: a button named "action" (the Add and Remove buttons)
+      // shadows the property with the button element itself.
+      if ((form.getAttribute('method') || '').toLowerCase() !== 'post' || form.hasAttribute('data-plain') || e.defaultPrevented) return;
+      e.preventDefault();
+      try {
+        const res = await fetch(new URL(form.getAttribute('action') || '', location.href), {method: 'POST', body: new FormData(form, e.submitter)});
+        const html = await res.text();
+        const y = res.url === location.href ? window.scrollY : 0;
+        history.replaceState(null, '', res.url);
+        const next = new DOMParser().parseFromString(html, 'text/html');
+        document.title = next.title;
+        document.body.replaceWith(next.body);
+        document.body.querySelectorAll('script').forEach(old => {  // parsed scripts do not run; recreate them
+          const s = document.createElement('script');
+          s.textContent = old.textContent;
+          old.replaceWith(s);
+        });
+        window.scrollTo(0, y);
+      } catch (err) {
+        form.submit();
+      }
+    });
+  </script>
 </head>
 <body>
 <header class="container">
@@ -27,7 +58,7 @@
     <ul>
       <li><a href="{% url 'kyc:review_list' %}">Reviewer</a></li>
       {% if user.is_staff %}
-      <li><form method="post" action="{% url 'kyc:logout' %}">{% csrf_token %}<button class="outline secondary" type="submit">Sign out</button></form></li>
+      <li><form method="post" action="{% url 'kyc:logout' %}" data-plain>{% csrf_token %}<button class="outline secondary" type="submit">Sign out</button></form></li>
       {% endif %}
     </ul>
   </nav>

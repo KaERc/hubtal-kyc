@@ -27,6 +27,7 @@
 </form>
 
 <script>
+(() => {
 // Show a field only while its show_if condition holds; hidden inputs are disabled so they are not submitted.
 // The server applies the same rule when it reads the form (engine.parse_entry), this is only for the eyes.
 const form = document.querySelector('form[data-flow-form]');
@@ -50,5 +51,6 @@ function refresh() {
 }
 form.addEventListener('change', refresh);
 refresh();
+})();
 </script>
 {% endblock %}

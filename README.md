@@ -17,7 +17,9 @@ uv run python manage.py runserver
 
 - Applicant side: <http://127.0.0.1:8000/> — pick a flow, fill in the sections, upload documents, submit.
 - Reviewer side: <http://127.0.0.1:8000/review/> — sign in with the demo account that `seed` prints
-  (username `reviewer`; the password is printed too. Demo only, set `KYC_DEMO_PASSWORD` to change it).
+  (username `reviewer`). `seed` prints the password only the first time it creates the account; after that read the default in
+  `kyc/management/commands/seed.py` or set your own with `uv run python manage.py changepassword reviewer`. Demo account only;
+  `KYC_DEMO_PASSWORD` overrides the default.
 - Tests: `uv run python manage.py test`
 
 State is a local SQLite file (`db.sqlite3`) and uploaded files in `media/`; both are git-ignored.
@@ -182,7 +184,7 @@ Within the time box I kept to one coherent slice: both flows, applicant and revi
 - **Reviewer assignment, search, bulk actions, per-field comments** (requests are per section).
 - **Translations, a country picker, phone normalisation.** English, free-text countries.
 - **A history of *answer* changes.** Only status changes are recorded.
-- **Automated browser tests.** The show/hide JavaScript was checked by hand in a browser, not by a test.
+- **Automated browser tests.** The show/hide JavaScript and the Back, cache and upload behaviour (see "Bugs I found by hand") were checked in a browser by a scripted run, not by an automated test.
 - **Deployment, CI, Docker.** It runs locally with three commands.
 
 ## Shortcuts with a known ceiling
@@ -206,6 +208,7 @@ out of scope entirely is in the previous section.
 | `config/settings.py` environment | Settings read from the environment by hand | No typing or validation (`KYC_DEBUG` is on only for the string `1`) | More settings appear: `pydantic-settings` |
 | `kyc/engine.py` `PHONE` | A loose phone pattern, countries as free text | Accepts numbers nobody can call; "Estonia" and "EE" are different answers | Data quality starts to matter: `phonenumbers` and a country list |
 | `kyc/templates/kyc/base.html` | Stylesheet from a CDN | The first load needs internet; no integrity hash | Production: vendor the file or build the CSS, add an integrity hash |
+| `kyc/templates/kyc/base.html` script | Forms are posted with `fetch` and the page body is swapped in place | Focus and the open state of `<details>` are lost on a swap; needs `FormData(form, submitter)` (browsers from 2023), otherwise the native post runs | More interactivity is needed: htmx, or server-rendered fragments |
 
 ## What I would change before production
 
@@ -270,6 +273,22 @@ Django as the stack, and the data-driven design with one engine and a flow defin
 
 **What I reviewed myself.** I read the history commit by commit. I checked everything the agent did without an explicit
 decision of mine, and I re-checked every point where I had told it what I wanted against what it delivered.
+
+**Bugs I found by hand.** The tests and the agent's own browser walkthrough were green when I found these by using the app.
+All three are about the browser, not the server, which is why a test client over HTTP could not see them.
+
+1. *Back showed a stale page.* Pages carried no cache headers, so after an upload the browser showed its saved copy of the
+   list. Fixed with `Cache-Control: no-store` on every response (one middleware). A test checks the header on every page type.
+2. *A file name that "jumped", and "No file chosen" next to a file that was already uploaded.* The native file input keeps its own
+   state, shows it beside the uploaded file, and browsers restore it on Back. Fixed by hiding the input and uploading as soon as a
+   file is chosen. A test checks that the file is listed once; the visible behaviour was checked in a real browser by the agent (a scripted run, not an automated test).
+3. *Back needed many presses.* Every save, upload and removal is a POST followed by a redirect, and each one added a history entry
+   for the same page. Fixed by posting forms with `fetch` and replacing the current entry. Checked in a real browser by the agent
+   (a scripted run, not an automated test): three uploads left the history length unchanged and one Back returned to the previous page.
+
+While checking the third fix the agent broke the Add button with it (a button named `action` shadows `form.action`, so the post went
+to a 404 address); that was found the same way, by running it in a browser, and fixed. None of these four is covered by a test of the
+behaviour itself, only by checks of the markup and headers; a browser-level test would have caught all of them.
 
 **Checks run during the build**
 

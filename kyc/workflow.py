@@ -14,7 +14,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from .engine import case_progress
-from .models import CaseEvent
+from .models import Case, CaseEvent
 
 
 class TransitionError(Exception):
@@ -46,6 +46,10 @@ def no_request_yet(case):
     return None if _open_requests(case).exists() else 'Add an information request first.'
 
 
+def no_reason(case):
+    return None if case.notes.exists() else 'Add an internal note with the reason first.'
+
+
 def all_of(*guards):
     return lambda case: next((e for g in guards if (e := g(case))), None)
 
@@ -58,7 +62,7 @@ TRANSITIONS = {
     'respond': Transition(frozenset({'info_requested'}), 'in_review', 'applicant', 'Send answers back to review',
                           all_of(incomplete, unanswered)),
     'approve': Transition(frozenset({'in_review'}), 'approved', 'reviewer', 'Approve', all_of(incomplete, unanswered)),
-    'reject': Transition(frozenset({'in_review'}), 'rejected', 'reviewer', 'Reject'),
+    'reject': Transition(frozenset({'in_review'}), 'rejected', 'reviewer', 'Reject', no_reason),
 }
 
 
@@ -70,11 +74,17 @@ def available(case, actor):
 
 def fire(case, event, actor, who, ip=None):
     t = TRANSITIONS.get(event)
-    if not t or t.actor != actor or case.status not in t.sources:
-        raise TransitionError(f'“{event}” is not possible while the case is {case.status_label.lower()}.')
-    if t.guard and (error := t.guard(case)):
-        raise TransitionError(error)
+    if not t or t.actor != actor:
+        raise TransitionError(f'“{event}” is not possible.')
     with transaction.atomic():
+        # Lock the row and judge the move on the status as it is now, not as this request loaded it:
+        # two reviewers pressing Approve and Reject at once must not both succeed.
+        Case.objects.select_for_update().get(pk=case.pk)
+        case.refresh_from_db()
+        if case.status not in t.sources:
+            raise TransitionError(f'“{event}” is not possible while the case is {case.status_label.lower()}.')
+        if t.guard and (error := t.guard(case)):
+            raise TransitionError(error)
         CaseEvent.objects.create(case=case, event=event, from_status=case.status, to_status=t.target, actor=who, ip=ip)
         case.status = t.target
         if event == 'submit':

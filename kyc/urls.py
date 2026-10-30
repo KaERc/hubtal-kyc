@@ -6,6 +6,7 @@ from . import views
 app_name = 'kyc'
 urlpatterns = [
     path('', views.start, name='start'),
+    # ponytail: no login throttling; django-axes, or a rate limit in front of it.
     path('login/', auth.LoginView.as_view(template_name='kyc/login.html'), name='login'),
     path('logout/', auth.LogoutView.as_view(next_page='kyc:start'), name='logout'),
     path('review/', views.review_list, name='review_list'),

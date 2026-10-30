@@ -35,6 +35,8 @@ def _open_requests(case):
 
 
 def incomplete(case):
+    # ponytail: every guard recomputes case_progress, a few queries per page load;
+    # cache it on the case for the request if it shows up in profiling.
     return None if case_progress(case).complete else 'Required information or documents are missing.'
 
 
@@ -85,6 +87,8 @@ def fire(case, event, actor, who, ip=None):
             raise TransitionError(f'“{event}” is not possible while the case is {case.status_label.lower()}.')
         if t.guard and (error := t.guard(case)):
             raise TransitionError(error)
+        # ponytail: nothing is announced; both sides learn of a change by opening their
+        # page. Send mail or enqueue a screening job from here.
         CaseEvent.objects.create(case=case, event=event, from_status=case.status, to_status=t.target, actor=who, ip=ip)
         case.status = t.target
         if event == 'submit':

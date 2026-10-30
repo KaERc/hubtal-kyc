@@ -12,6 +12,8 @@ from decimal import Decimal, InvalidOperation
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 
+# ponytail: a loose pattern, and countries are free text; the phonenumbers package
+# and a country list when data quality starts to matter.
 PHONE = re.compile(r'^\+?[0-9 ()\-]{6,20}$')
 MAX_TEXT = 4000
 MAX_NUMBER = 10**12  # int(Decimal('1e5000')) would build a number JSON cannot store

@@ -18,6 +18,8 @@ from django.core.exceptions import ImproperlyConfigured
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Prototype defaults: run out of the box locally. Production must set both (see README).
+# ponytail: three variables read by hand, with no typing or validation (KYC_DEBUG is
+# on only for the exact string "1"); pydantic-settings if more settings appear.
 SECRET_KEY = os.environ.get('KYC_SECRET_KEY', 'dev-only-not-a-secret')
 DEBUG = os.environ.get('KYC_DEBUG', '1') == '1'
 if not DEBUG and SECRET_KEY == 'dev-only-not-a-secret':
@@ -70,6 +72,8 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# ponytail: one SQLite file and one process; PostgreSQL for deployment (the JSON
+# answers also want JSONB there).
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',

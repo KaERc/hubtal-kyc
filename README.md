@@ -110,8 +110,9 @@ through views that check the case token or the reviewer login, always as downloa
 
 I treated the form as a description of today's process, not a specification.
 
-- **Asked once, not twice.** The EOR form asks start date, position and work location both in the employer part and in the
-  candidate part. They are asked once, in *Employee engagement*.
+- **Asked once, not twice.** The EOR form asks the expected start date and the work location both in the employer part and in
+  the candidate part. They are asked once, in *Employee engagement*, which also took the work arrangement and the expected
+  employment period from the candidate part: they describe the job, not the person.
 - **Follow-up questions are conditional.** "Others: ____" became an `Other` option plus a required follow-up that appears
   only then. "Employer / business name" and "Position" in non-EOR are asked only when the source of wealth is employment or
   business ownership. "If yes, please provide details" is required only when one of the four immigration answers is yes.

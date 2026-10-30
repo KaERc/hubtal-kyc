@@ -20,7 +20,8 @@ class Command(BaseCommand):
             reviewer.save()
         self.stdout.write(f'Reviewer sign-in: {USERNAME} / {password if created else "(unchanged)"}  ->  /review/')
         if Case.objects.exists():
-            return self.stdout.write('Cases already exist, not adding demo cases.')
+            return self.stdout.write('Cases already exist, so no demo cases were added and there are no new links. '
+                                     'To start over: delete db.sqlite3 and media/, run migrate, then seed again.')
 
         # 1. A clean non-EOR case, submitted.
         a = demo.make_case('id-non-eor')

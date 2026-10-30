@@ -25,7 +25,8 @@ Delete them and run `migrate` again to reset. The page styling loads Pico CSS fr
 
 ### A two-minute tour
 
-1. **Answer a reviewer's question.** `seed` prints three numbered links, one per demo case. Open **link 2** (*EOR, question
+1. **Answer a reviewer's question.** `seed` prints three numbered links, one per demo case (it only runs on an empty
+   database; to get the links again, delete `db.sqlite3` and `media/`, run `migrate`, then `seed`). Open **link 2** (*EOR, question
    open*). At the top of the page is a box *Question from the reviewer* about a bankruptcy answer. Type a reply, click
    **Send answer**, then click **Send answers back to review**.
 2. **See it as the reviewer.** Go to <http://127.0.0.1:8000/review/> and sign in. The list shows each case with its

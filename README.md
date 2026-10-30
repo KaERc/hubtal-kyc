@@ -63,8 +63,11 @@ a section describes; the engine judges completeness from the same description.
 | `CaseEvent` | history: event, from → to status, who, when, IP. Written only by the state machine |
 
 **Why answers are JSON.** The shape of the answers belongs to the flow definition, not to the database schema. A new
-country or a changed question needs no migration. The cost is that answers cannot be queried or constrained in SQL;
-if reporting is needed later, project the few fields that matter into columns, or move to Postgres `JSONB` with indexes.
+country or a changed question needs no migration. The cost: the database knows nothing about the answers. No column types,
+no `NOT NULL`, no foreign keys, no indexes. They can still be read with JSON operators (Django's `data__applicant__full_name`
+style lookups work on SQLite and PostgreSQL), but filtering or reporting across many cases is slow and awkward, and
+validity is enforced only by the application (`engine.py`), never by the database. If reporting is needed later, project the
+few fields that matter into columns, or move to PostgreSQL `JSONB` with indexes.
 
 ## Decisions
 

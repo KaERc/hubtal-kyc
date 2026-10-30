@@ -1,7 +1,11 @@
 import shutil
 import tempfile
 
+from io import StringIO
+
+from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import QueryDict
 from django.test import TestCase, override_settings
@@ -346,3 +350,15 @@ class CachingTests(TestCase):
         html = self.client.get(f'/c/{case.token}/docs/').content.decode()
         self.assertEqual(html.count('>passport.pdf</a>'), 1)
         self.assertIn('onchange="this.form.requestSubmit()"', html)  # choosing a file uploads it; no "No file chosen" state
+
+
+class DemoLoginTests(TestCase):
+    def test_seed_can_be_run_again_and_the_printed_login_works(self):
+        out = StringIO()
+        call_command('seed', stdout=out)
+        User.objects.filter(username=settings.DEMO_REVIEWER['username']).update(password='forgotten')
+        call_command('seed', stdout=out)  # an earlier run's password is lost: seed must make the login work again
+        self.assertTrue(self.client.login(**settings.DEMO_REVIEWER))
+        self.assertEqual(Case.objects.count(), 3)
+        self.assertEqual(out.getvalue().count('/c/'), 6)  # three links on the first run, the same three listed on the second
+        self.assertIn(settings.DEMO_REVIEWER['password'], out.getvalue())

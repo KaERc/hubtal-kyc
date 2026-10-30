@@ -132,5 +132,9 @@ MEDIA_ROOT = BASE_DIR / 'media'
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_FILES_PER_CASE = 20
 
+# ponytail: a fixed demo reviewer login that `seed` resets and prints on every run, so whoever runs this
+# prototype can get in; delete the account and the reset before any real use.
+DEMO_REVIEWER = {'username': 'reviewer', 'password': os.environ.get('KYC_DEMO_PASSWORD', 'reviewer')}
+
 LOGIN_URL = 'kyc:login'
 LOGIN_REDIRECT_URL = 'kyc:review_list'

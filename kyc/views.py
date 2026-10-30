@@ -21,7 +21,9 @@ reviewer_only = user_passes_test(lambda u: u.is_active and u.is_staff, login_url
 
 
 def client_ip(request):
-    return request.META.get('REMOTE_ADDR')  # behind a proxy this must come from a trusted header (README)
+    # ponytail: the socket address, which behind a proxy is the proxy's; read a
+    # trusted X-Forwarded-For once there is one.
+    return request.META.get('REMOTE_ADDR')
 
 
 def case_by_token(token):
@@ -31,6 +33,8 @@ def case_by_token(token):
 @require_http_methods(['GET', 'POST'])
 def start(request):
     if request.method == 'POST':
+        # ponytail: anyone can create cases, unthrottled; cases created by operations
+        # (or a rate limit and a captcha) once the site is on the internet.
         flow = FLOWS.get(request.POST.get('flow'))
         if not flow:
             raise Http404
@@ -201,6 +205,8 @@ def download(request, token, pk):
 
 @reviewer_only
 def review_list(request):
+    # ponytail: no pagination or search, and progress is computed per case; page the
+    # list (and store a completeness count) when it outgrows a screen or two.
     status = request.GET.get('status', '')
     cases = Case.objects.prefetch_related('documents', 'info_requests').order_by('-updated_at')
     cases = cases.filter(status=status) if status in STATUS_LABELS else cases.exclude(status='draft')

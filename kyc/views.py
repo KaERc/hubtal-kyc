@@ -83,10 +83,14 @@ def section(request, token, key):
     s = next((s for s in case.flow.sections if s.key == key), None)
     if s is None:
         raise Http404
-    entries = engine.entries(s, case.data)
-    errs = [{} for _ in entries]
-    posted = request.method == 'POST'
-    if posted:
+    if request.method != 'POST':
+        entries = engine.entries(s, case.data)
+        return render_section(request, case, s, entries, [{} for _ in entries])
+
+    with transaction.atomic():
+        # Re-read under a lock: the other party may have saved another section a moment ago, and `data` is
+        # one JSON document, so saving from a stale copy would silently overwrite their work.
+        case = Case.objects.select_for_update().get(pk=case.pk)
         if not case.editable:
             messages.error(request, 'This case is locked while it is with the reviewer.')
             return redirect('kyc:case', token=token)
@@ -108,18 +112,23 @@ def section(request, token, key):
             entries, errs = [values], [errors]
         case.data[s.key] = entries if s.repeat else entries[0]
         case.save(update_fields=['data', 'updated_at'])
-        if action:
-            return redirect('kyc:section', token=token, key=key)
-        if not any(errs):
-            messages.success(request, f'Saved “{s.title}”.')
-            return redirect('kyc:case', token=token)
+
+    if action:
+        return redirect('kyc:section', token=token, key=key)
+    if not any(errs):
+        messages.success(request, f'Saved “{s.title}”.')
+        return redirect('kyc:case', token=token)
+    messages.error(request, 'Some answers were not saved, see the marked fields.')
+    return render_section(request, case, s, entries, errs, typed=request.POST)
+
+
+def render_section(request, case, s, entries, errs, typed=None):
     forms = [engine.bind(s, e, errs[i], f'{i}-' if s.repeat else '') for i, e in enumerate(entries)]
-    if posted:  # show what was typed next to the error rather than a blank field
+    if typed is not None:  # show what was typed next to the error rather than a blank field
         for bound in forms:
             for b in bound:
                 if b['error']:
-                    b['value'] = request.POST.get(b['name'])
-        messages.error(request, 'Some answers were not saved, see the marked fields.')
+                    b['value'] = typed.get(b['name'])
     return render(request, 'kyc/section.html', {'case': case, 's': s, 'forms': forms})
 
 

@@ -80,3 +80,31 @@ class Flow:
     subject: str            # "section.field" used as the case's display name
     sections: tuple
     docs: tuple = ()
+
+    def __post_init__(self):
+        """Fail when the flow is imported, not on a page: a typo in a new flow must not wait for an applicant to find it."""
+        def bad(message):
+            raise ValueError(f'flow {self.key}: {message}')
+
+        fields = {s.key: [f.key for f in s.fields] for s in self.sections}
+        if len(fields) != len(self.sections):
+            bad('duplicate section key')
+        section, _, field = self.subject.partition('.')
+        home = next((s for s in self.sections if s.key == section), None)
+        if not home or home.repeat or field not in fields[section]:
+            bad(f'subject {self.subject!r} must name a field of a plain (non-repeat) section')
+        for s in self.sections:
+            keys = fields[s.key]
+            if len(set(keys)) != len(keys):
+                bad(f'duplicate field key in section {s.key}')
+            for i, f in enumerate(s.fields):
+                for path, _ in f.show_if:
+                    if path not in keys[:i]:
+                        bad(f'{s.key}.{f.key}: show_if {path!r} must be an earlier field of the same section')
+        if len({d.key for d in self.docs}) != len(self.docs):
+            bad('duplicate document key')
+        for d in self.docs:
+            for path, _ in d.show_if:
+                sec, _, fld = path.partition('.')
+                if fld not in fields.get(sec, ()):
+                    bad(f'document {d.key}: show_if {path!r} must be "section.field" of this flow')

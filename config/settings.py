@@ -13,11 +13,15 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Prototype defaults: run out of the box locally. Production must set both (see README).
 SECRET_KEY = os.environ.get('KYC_SECRET_KEY', 'dev-only-not-a-secret')
 DEBUG = os.environ.get('KYC_DEBUG', '1') == '1'
+if not DEBUG and SECRET_KEY == 'dev-only-not-a-secret':
+    raise ImproperlyConfigured('Set KYC_SECRET_KEY when KYC_DEBUG=0.')
 
 ALLOWED_HOSTS = os.environ.get('KYC_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
@@ -25,7 +29,6 @@ ALLOWED_HOSTS = os.environ.get('KYC_ALLOWED_HOSTS', 'localhost,127.0.0.1').split
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',

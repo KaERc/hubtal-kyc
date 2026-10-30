@@ -69,6 +69,15 @@ style lookups work on SQLite and PostgreSQL), but filtering or reporting across 
 validity is enforced only by the application (`engine.py`), never by the database. If reporting is needed later, project the
 few fields that matter into columns, or move to PostgreSQL `JSONB` with indexes.
 
+**My position.** I am a proponent of normalised schemas, and I know this one is not: a JSON column holding nested answers
+breaks first normal form (the list of beneficial owners is a repeating group inside a single column), and because the
+database cannot see the dependencies between the values, it cannot enforce second or third normal form either. I chose it
+for this prototype knowingly, as the price of the brief's requirement that a new country or variant should not mean rebuilding
+the application, and I would not carry it into production unchanged. The marker on `Case.data` and the first row of the
+ledger below say where it ends. Direction for production: the entities that screening has to search and deduplicate
+(applicant, candidate, beneficial owners, documents) become typed tables; only what is genuinely free-form stays JSON
+(`JSONB`).
+
 ## Decisions
 
 **One adaptive engine, two flows.** EOR and non-EOR are two flow definitions run by the same engine, not one form full

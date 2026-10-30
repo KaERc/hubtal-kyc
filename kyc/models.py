@@ -22,10 +22,20 @@ def new_token():
 class Case(models.Model):
     """One KYC case. Answers live in `data` as {section: {field: value}} (a list of those for repeated sections):
     the shape of the answers is owned by the flow definition, so a new flow needs no migration."""
+    # ponytail: the link is the only credential, and an EOR case has one link for
+    # both parties; emailed, expiring links per party before real applicants use it.
     token = models.CharField(max_length=32, unique=True, default=new_token)
     flow_key = models.CharField(max_length=40)
+    # ponytail: only the version string is stored, not the flow definition it names;
+    # snapshot the answers and the declaration wording at submit so a later flow edit
+    # cannot change what was agreed.
     flow_version = models.CharField(max_length=20)  # pins the exact declaration texts the applicant agreed to
     status = models.CharField(max_length=20, default='draft', choices=tuple(STATUS_LABELS.items()))
+    # ponytail: answers as one JSON document break first normal form (nested lists
+    # such as owners, values the database cannot type, constrain or index) and hide
+    # their dependencies from it; normalise persons, owners and documents into typed
+    # tables, or move to PostgreSQL JSONB with indexes, once screening or reporting
+    # must search across cases.
     data = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -55,6 +65,9 @@ class Case(models.Model):
 class Document(models.Model):
     case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name='documents')
     key = models.CharField(max_length=40)  # a Doc.key from the flow
+    # ponytail: local disk, unencrypted and not virus-scanned, and Django reads the
+    # whole upload before the 10 MB check; private object storage with scanning and a
+    # size limit at the proxy for production.
     file = models.FileField(upload_to='cases/%Y/%m/')
     name = models.CharField(max_length=255)
     uploaded_at = models.DateTimeField(auto_now_add=True)

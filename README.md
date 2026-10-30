@@ -62,3 +62,92 @@ a section describes; the engine judges completeness from the same description.
 **Why answers are JSON.** The shape of the answers belongs to the flow definition, not to the database schema. A new
 country or a changed question needs no migration. The cost is that answers cannot be queried or constrained in SQL;
 if reporting is needed later, project the few fields that matter into columns, or move to Postgres `JSONB` with indexes.
+
+## Decisions
+
+**One adaptive engine, two flows.** EOR and non-EOR are two flow definitions run by the same engine, not one form full
+of `if`s and not two separate apps. They share nothing but the vocabulary (sections, fields, conditions, documents,
+declarations), which is exactly what a Singapore flow or an "Indonesia, remote worker" variant would share too.
+
+**Conditions are data.** `show_if` on a field or document says when it applies (`purpose == other`, "any of these four
+immigration answers is yes", "certification == yes"). The server and the browser read the same description. Hidden
+answers are dropped on save, so a stale "other: ..." never lingers and never counts as missing.
+
+**The applicant needs no account.** Starting a case gives a private link with an unguessable token. Fewer steps for
+the applicant, nothing to remember, and the reviewer side is the only place with passwords. The cost is that the link
+is the credential; see "Before production".
+
+**Saving is forgiving, submitting is strict.** Every section saves on its own, valid answers are kept even if another
+field is wrong or empty, so nobody loses work. A malformed value (bad email, a birth date in the future) is rejected
+with a message next to the field and shows what was typed. *Missing* is not an error on save; it is computed from the
+flow and shown as "N missing" per section and as a list on the case page. **Submit** is blocked until nothing is missing.
+
+**One state machine.** `workflow.py` is a table of events (`submit`, `start_review`, `request_info`, `respond`,
+`approve`, `reject`) with the statuses each can start from, who may fire it, and a guard (cannot submit with gaps,
+cannot approve while a question is unanswered). `fire()` is the only code that changes a status, and it writes the
+history row, so the audit trail cannot drift from the status. I considered a library and chose a ~40-line table:
+there is one machine, no parallel states, and a dependency would not remove any code.
+
+**Reviewer feedback is attached to the case, not to email.** "Request information" creates a question, optionally about
+one section, and moves the case to *information requested*. That unlocks editing for the applicant, who sees the
+question on the case page and answers it there. Sending the case back is blocked until every question has a reply.
+Notes are separate and internal.
+
+**Red flags are visible.** A field can name the answer that needs attention (`flag_on`: "yes" to "ever bankrupt?", a
+third-party transfer as the method of receiving funds). Those answers are listed at the top of the reviewer's page.
+This is a pointer for a human, not a decision: nothing is auto-rejected.
+
+**Declarations and consent are recorded as evidence.** Each statement is its own required checkbox, the signature is the
+typed name, and what is stored is: the confirmations, the case's `flow_version` (which pins the exact wording, because
+the wording lives in versioned code), the submission time, and the IP in the history. That is enough for a prototype;
+whether it is *legally* sufficient is a question for the people who own compliance, not for this code.
+
+**Documents are requirements of the flow.** Each flow lists the documents it needs, which may be conditional or
+optional. Uploads are checked by extension, size and file signature, stored outside the web root, and served only
+through views that check the case token or the reviewer login, always as downloads.
+
+### Where I departed from the form
+
+I treated the form as a description of today's process, not a specification.
+
+- **Asked once, not twice.** The EOR form asks start date, position and work location both in the employer part and in the
+  candidate part. They are asked once, in *Employee engagement*.
+- **Follow-up questions are conditional.** "Others: ____" became an `Other` option plus a required follow-up that appears
+  only then. "Employer / business name" and "Position" in non-EOR are asked only when the source of wealth is employment or
+  business ownership. "If yes, please provide details" is required only when one of the four immigration answers is yes.
+- **Gaps in the form, fixed.** Years of experience offered only "< 5" and "5–10" (no 10+); I added "More than 10 years".
+  Non-EOR did not ask for the passport expiry date; it does now. A visa case needs a passport copy, so it is a required
+  document although the form never listed one.
+- **The candidate consents for themselves.** In the EOR form only the company declares, including consent for the
+  *candidate's* data. I added a short candidate consent section. This one needs legal review before anyone relies on it.
+- **Dates and numbers are checked.** Birth dates must be in the past, expiry and start dates in the future, ownership is
+  between 0 and 100, emails and phone numbers must look like emails and phone numbers.
+- **Who fills what.** The EOR form is really two people's work. Sections carry a *To be filled in by* label (employer or
+  candidate), but there is still one link per case; see "Before production".
+
+## Adding a country or a variant
+
+Create a module in `kyc/flows/` that exports `FLOW`. It is picked up automatically. No migration, no view, no template.
+
+```python
+# kyc/flows/singapore_ep.py  (illustrative, not in the repo)
+from .spec import Doc, Field, Flow, Section, ch, with_other
+
+FLOW = Flow(
+    key='sg-ep', version='2027-01-15', country='SG', title='Singapore — Employment Pass', subject='applicant.full_name',
+    sections=(
+        Section('applicant', 'Applicant', (
+            Field('full_name', 'Full name'),
+            Field('nric_fin', 'NRIC / FIN', required=False),
+            *with_other(Field('purpose', 'Purpose', 'select', options=ch('Work', ('other', 'Other')))),
+        )),
+    ),
+    docs=(Doc('passport', 'Passport copy'),),
+)
+```
+
+The tests include "every registered flow can be completed from its own description", so a new flow is checked for free.
+
+**When requirements change.** Edit the flow and bump `version`. New cases get the new version, old cases keep the version
+they were started under. Honest limit: the old *definition* is not archived. For production, keep the previous versions of a
+flow importable (or snapshot the wording at submit) so an old case can still be shown exactly as it was agreed.

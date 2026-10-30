@@ -268,6 +268,9 @@ Django as the stack, and the data-driven design with one engine and a flow defin
   admitted the mix-up, and the settings stayed as they are.
 - Nothing is pushed until I have read it myself.
 
+**What I reviewed myself.** I read the history commit by commit. I checked everything the agent did without an explicit
+decision of mine, and I re-checked every point where I had told it what I wanted against what it delivered.
+
 **Checks run during the build**
 
 - Tests were written with the code. Two of them were verified by breaking the code on purpose and watching them fail (zero percent

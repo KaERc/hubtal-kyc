@@ -147,7 +147,9 @@ FLOW = Flow(
 )
 ```
 
-The tests include "every registered flow can be completed from its own description", so a new flow is checked for free.
+A mistake in a flow (an unknown subject, a condition that points at a field that does not exist, a duplicate key) raises when
+the app starts instead of on an applicant's page, and the tests include "every registered flow can be completed from its own
+description", so a new flow is checked for free.
 
 **When requirements change.** Edit the flow and bump `version`. New cases get the new version, old cases keep the version
 they were started under. Honest limit: the old *definition* is not archived. For production, keep the previous versions of a
@@ -177,8 +179,10 @@ Within the time box I kept to one coherent slice: both flows, applicant and revi
    apply to the applicants (I did not research that here).
 3. **A frozen record at submit.** Store a copy of the answers and the declaration wording when the case is submitted, so a
    later edit or a new flow version can never change what was agreed.
-4. **Database and concurrency.** PostgreSQL, and `select_for_update` inside `workflow.fire` so two reviewers clicking at once
-   cannot both succeed.
+4. **Database and concurrency.** PostgreSQL. Saving a section already re-reads the case under a row lock (and SQLite is set to
+   begin transactions immediately, so the lock holds there too), because answers are one JSON document and two people may fill
+   different sections at once. `workflow.fire` is not locked yet: two reviewers clicking at once could both succeed. There is
+   no test for the race itself.
 5. **Reviewer access.** Real accounts with roles, SSO or two-factor sign-in, login throttling (there is none), an access log
    for who looked at personal data.
 6. **Deployment settings.** `KYC_SECRET_KEY`, `KYC_DEBUG=0` (the app refuses to start with `KYC_DEBUG=0` and the development

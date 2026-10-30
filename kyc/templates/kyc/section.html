@@ -1,0 +1,54 @@
+{% extends "kyc/base.html" %}
+{% block title %}{{ s.title }}{% endblock %}
+{% block content %}
+<p><a href="{% url 'kyc:case' case.token %}">← Back to the case</a></p>
+<hgroup>
+  <h1>{{ s.title }}</h1>
+  {% if s.party %}<p>To be filled in by: {{ s.party }}</p>{% endif %}
+</hgroup>
+{% if s.intro %}<p>{{ s.intro }}</p>{% endif %}
+{% if not case.editable %}<article>This case is read-only while it is with the reviewer.</article>{% endif %}
+
+<form method="post" data-flow-form>{% csrf_token %}
+  <button type="submit" hidden></button>{# Enter saves; without this the first Remove button would be the default #}
+  <fieldset {% if not case.editable %}disabled{% endif %}>
+    {% if s.repeat %}<input type="hidden" name="n" value="{{ forms|length }}">{% endif %}
+    {% for bound in forms %}
+      {% if s.repeat %}<article><header><strong>Entry {{ forloop.counter }}</strong></header>{% endif %}
+      {% for b in bound %}{% include "kyc/_field.html" %}{% endfor %}
+      {% if s.repeat %}
+        <button type="submit" name="action" value="remove-{{ forloop.counter0 }}" class="outline secondary">Remove this entry</button>
+      </article>
+      {% endif %}
+    {% endfor %}
+    {% if s.repeat %}<button type="submit" name="action" value="add" class="secondary">Add {% if forms %}another{% else %}an entry{% endif %}</button>{% endif %}
+    <button type="submit">Save</button>
+  </fieldset>
+</form>
+
+<script>
+// Show a field only while its show_if condition holds; hidden inputs are disabled so they are not submitted.
+// The server applies the same rule when it reads the form (engine.parse_entry), this is only for the eyes.
+const form = document.querySelector('form[data-flow-form]');
+function valueOf(name) {
+  const els = [...form.elements].filter(e => e.name === name);
+  if (!els.length) return null;
+  if (els[0].type === 'checkbox') return els.filter(e => e.checked).map(e => e.value);
+  if (els[0].type === 'radio') { const on = els.find(e => e.checked); return on ? on.value : null; }
+  return els[0].value;
+}
+function refresh() {
+  form.querySelectorAll('[data-cond]').forEach(box => {
+    const prefix = box.dataset.prefix || '';
+    const show = JSON.parse(box.dataset.cond).some(([key, expected]) => {
+      const got = valueOf(prefix + key);
+      return Array.isArray(got) ? got.includes(expected) : got === expected;
+    });
+    box.hidden = !show;
+    box.querySelectorAll('input, select, textarea').forEach(i => i.disabled = !show);
+  });
+}
+form.addEventListener('change', refresh);
+refresh();
+</script>
+{% endblock %}

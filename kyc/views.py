@@ -64,3 +64,50 @@ def reply(request, token, pk):
         ask.save()
         messages.success(request, 'Answer saved. Update your details if needed, then send everything back.')
     return redirect('kyc:case', token=token)
+
+
+def section(request, token, key):
+    """Show or save one section. Saving is forgiving: valid answers are kept even when another field is
+    invalid or still empty, so an applicant can leave and come back; completeness is judged at submit."""
+    case = case_by_token(token)
+    s = next((s for s in case.flow.sections if s.key == key), None)
+    if s is None:
+        raise Http404
+    entries = engine.entries(s, case.data)
+    errs = [{} for _ in entries]
+    posted = request.method == 'POST'
+    if posted:
+        if not case.editable:
+            messages.error(request, 'This case is locked while it is with the reviewer.')
+            return redirect('kyc:case', token=token)
+        action = request.POST.get('action', '')
+        if s.repeat:
+            try:
+                n = min(int(request.POST.get('n', 0)), 50)
+            except ValueError:
+                n = 0
+            parsed = [engine.parse_entry(s, request.POST, f'{i}-') for i in range(n)]
+            entries, errs = [v for v, _ in parsed], [e for _, e in parsed]
+            if action == 'add':
+                entries.append({})
+                errs.append({})
+            elif action.startswith('remove-') and action[7:].isdigit() and int(action[7:]) < len(entries):
+                del entries[int(action[7:])], errs[int(action[7:])]
+        else:
+            values, errors = engine.parse_entry(s, request.POST)
+            entries, errs = [values], [errors]
+        case.data[s.key] = entries if s.repeat else entries[0]
+        case.save(update_fields=['data', 'updated_at'])
+        if action:
+            return redirect('kyc:section', token=token, key=key)
+        if not any(errs):
+            messages.success(request, f'Saved “{s.title}”.')
+            return redirect('kyc:case', token=token)
+    forms = [engine.bind(s, e, errs[i], f'{i}-' if s.repeat else '') for i, e in enumerate(entries)]
+    if posted:  # show what was typed next to the error rather than a blank field
+        for bound in forms:
+            for b in bound:
+                if b['error']:
+                    b['value'] = request.POST.get(b['name'])
+        messages.error(request, 'Some answers were not saved, see the marked fields.')
+    return render(request, 'kyc/section.html', {'case': case, 's': s, 'forms': forms})

@@ -196,19 +196,21 @@ the pages end to end over HTTP (applicant to approval, access control, locking, 
 ## How AI was used
 
 I built this with **Claude Code** (Anthropic's coding agent, model Claude Sonnet 5.5) and its *ponytail* skill, which pushes
-towards the smallest solution that works. The agent wrote nearly all of the code, tests, templates and this README; I set
-the direction and steered.
+towards the smallest solution that works. The agent wrote nearly all of the code, tests, templates and this README. I gave it the brief and the
+reference form, read its plan, told it to go ahead, and steered along the way.
 
-**What I decided:** the scope for the time box (a thin vertical slice, everything else listed above); to approve a written
-plan before any code was written; Django for the stack; that the allowed status changes should be an explicit state machine
-rather than a list of allowed statuses (the agent proposed a table, I asked for the state-machine shape and agreed to keep
-it library-free); and small commits on topic branches, which is why the history reads as it does.
+**What the agent proposed and I let stand:** the scope for the time box (a thin vertical slice, everything else listed above),
+Django as the stack, and the data-driven design with one engine and a flow definition per variant.
 
-**How the agent's work was checked:**
+**Where I steered:** I asked whether the allowed status changes should be an explicit state machine rather than a list of
+allowed statuses; the agent answered with an event-based table, without a library, and I did not push for one. I also
+required small commits on topic branches, which is why the history reads as it does.
+
+**Checks run during the build, by the agent at my direction:**
 
 - Tests were written with the code, and two of them were verified by breaking the code on purpose and watching them fail
   (zero percent counted as "not answered"; the reviewer-only guard removed from the case list).
-- Both flows load, and every page of both renders; the applicant and reviewer paths were walked in a browser, including the
+- Both flows load and every page of both renders; the applicant and reviewer paths were walked in a browser, including the
   conditional fields and the red-flag view.
-- A claim in this README that turned out wrong when I re-read it against the form (which questions the EOR form asks twice)
-  was corrected, and the "drop in a new flow" claim was tested with a throwaway Singapore module.
+- A claim in this README that turned out wrong when re-read against the form (which questions the EOR form asks twice) was
+  corrected, and the "drop in a new flow" claim was tested with a throwaway Singapore module.

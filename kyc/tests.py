@@ -324,3 +324,17 @@ class ReviewFixTests(TestCase):
         self.assertEqual(names(), ['A', 'B'])
         self.client.post(url, {'n': '2', 'action': 'remove-0', '0-full_name': 'A', '1-full_name': 'B', '1-ownership_pct': '40'})
         self.assertEqual(names(), ['B'])
+
+
+@override_settings(MEDIA_ROOT=MEDIA)
+class CachingTests(TestCase):
+    """Back must not show a stale copy of a page that holds personal data."""
+
+    def test_no_page_is_cacheable(self):
+        case = demo.make_case('id-non-eor')
+        User.objects.create_user('rev', password='pw', is_staff=True)
+        self.client.login(username='rev', password='pw')
+        urls = ['/', '/login/', f'/c/{case.token}/', f'/c/{case.token}/docs/', f'/c/{case.token}/s/applicant/',
+                f'/c/{case.token}/file/{case.documents.first().pk}/', '/review/', f'/review/{case.pk}/']
+        for url in urls:
+            self.assertIn('no-store', self.client.get(url)['Cache-Control'], url)

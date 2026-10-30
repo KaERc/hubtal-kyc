@@ -152,3 +152,63 @@ The tests include "every registered flow can be completed from its own descripti
 **When requirements change.** Edit the flow and bump `version`. New cases get the new version, old cases keep the version
 they were started under. Honest limit: the old *definition* is not archived. For production, keep the previous versions of a
 flow importable (or snapshot the wording at submit) so an old case can still be shown exactly as it was agreed.
+
+## What I intentionally did not build
+
+Within the time box I kept to one coherent slice: both flows, applicant and reviewer, end to end.
+
+- **Applicant sign-in, invitations, one link per party.** The EOR case has an employer part and a candidate part but one link.
+- **Email or any other notification.** Neither side is told anything; they come back to their page.
+- **Identity verification, sanctions and adverse-media screening, registry lookups.** Out of scope by the brief. They would
+  plug in as background jobs triggered by a state change, with results shown to the reviewer as facts on the case.
+- **A second country.** Shown as an example above and verified to load, not shipped.
+- **Reviewer assignment, search, bulk actions, per-field comments** (requests are per section).
+- **Translations, a country picker, phone normalisation.** English, free-text countries.
+- **A history of *answer* changes.** Only status changes are recorded.
+- **Automated browser tests.** The show/hide JavaScript was checked by hand in a browser, not by a test.
+- **Deployment, CI, Docker.** It runs locally with three commands.
+
+## What I would change before production
+
+1. **The link is the credential.** Replace it with emailed, expiring links per party (or accounts), and let operations
+   create cases instead of leaving the start page public. Today anyone can start cases.
+2. **Personal data.** Passport numbers, birth dates and scans need encryption at rest, private object storage with
+   short-lived download links, virus scanning, and a retention and deletion policy. Check which data-protection regimes
+   apply to the applicants (I did not research that here).
+3. **A frozen record at submit.** Store a copy of the answers and the declaration wording when the case is submitted, so a
+   later edit or a new flow version can never change what was agreed.
+4. **Database and concurrency.** PostgreSQL, and `select_for_update` inside `workflow.fire` so two reviewers clicking at once
+   cannot both succeed.
+5. **Reviewer access.** Real accounts with roles, SSO or two-factor sign-in, login throttling (there is none), an access log
+   for who looked at personal data.
+6. **Deployment settings.** `KYC_SECRET_KEY`, `KYC_DEBUG=0`, `KYC_ALLOWED_HOSTS`, HTTPS with secure cookies, a trusted proxy
+   header for the client IP (it currently reads the socket address), and an upload size limit at the proxy: Django receives
+   the whole body before the 10 MB check runs.
+7. **Operations.** Error tracking, structured logs without personal data, backups, CI with the tests and a browser test of
+   the conditional fields.
+
+## Tests
+
+`uv run python manage.py test` runs the suite in a second or two. It covers the engine (conditions, validation, completeness,
+red flags, "every registered flow can be completed"), the state machine (guards, who may fire what, the recorded history) and
+the pages end to end over HTTP (applicant to approval, access control, locking, upload checks, file access).
+
+## How AI was used
+
+I built this with **Claude Code** (Anthropic's coding agent, model Claude Sonnet 5.5) and its *ponytail* skill, which pushes
+towards the smallest solution that works. The agent wrote nearly all of the code, tests, templates and this README; I set
+the direction and steered.
+
+**What I decided:** the scope for the time box (a thin vertical slice, everything else listed above); to approve a written
+plan before any code was written; Django for the stack; that the allowed status changes should be an explicit state machine
+rather than a list of allowed statuses (the agent proposed a table, I asked for the state-machine shape and agreed to keep
+it library-free); and small commits on topic branches, which is why the history reads as it does.
+
+**How the agent's work was checked:**
+
+- Tests were written with the code, and two of them were verified by breaking the code on purpose and watching them fail
+  (zero percent counted as "not answered"; the reviewer-only guard removed from the case list).
+- Both flows load, and every page of both renders; the applicant and reviewer paths were walked in a browser, including the
+  conditional fields and the red-flag view.
+- A claim in this README that turned out wrong when I re-read it against the form (which questions the EOR form asks twice)
+  was corrected, and the "drop in a new flow" claim was tested with a throwaway Singapore module.

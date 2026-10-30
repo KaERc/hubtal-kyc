@@ -345,4 +345,4 @@ class CachingTests(TestCase):
         case.status = 'draft'
         html = self.client.get(f'/c/{case.token}/docs/').content.decode()
         self.assertEqual(html.count('>passport.pdf</a>'), 1)
-        self.assertIn('onchange="this.form.submit()"', html)  # choosing a file uploads it; no "No file chosen" state
+        self.assertIn('onchange="this.form.requestSubmit()"', html)  # choosing a file uploads it; no "No file chosen" state

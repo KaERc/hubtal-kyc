@@ -25,7 +25,7 @@
         <form method="post" enctype="multipart/form-data">{% csrf_token %}
           <input type="hidden" name="key" value="{{ d.key }}">
           <label role="button" class="secondary">{% if files %}Add another{% else %}Upload{% endif %}
-            <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" autocomplete="off" hidden onchange="this.form.submit()">
+            <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" autocomplete="off" hidden onchange="this.form.requestSubmit()">
           </label>
           <noscript><button type="submit">Send the chosen file</button></noscript>
         </form>

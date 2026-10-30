@@ -1,0 +1,59 @@
+{% extends "kyc/base.html" %}
+{% block title %}{{ case.flow.title }}{% endblock %}
+{% block content %}
+<hgroup>
+  <h1>{{ case.flow.title }}</h1>
+  <p><span class="badge s-{{ case.status }}">{{ case.status_label }}</span>
+     &nbsp;<small>This page is private to you: keep the link, it is the only way back to the case.</small></p>
+</hgroup>
+
+{% for r in requests %}
+<article>
+  <header><strong>Question from the reviewer</strong>
+    {% if r.section %}<small> — about <a href="{% url 'kyc:section' case.token r.section %}">{{ r.section_title }}</a></small>{% endif %}</header>
+  <p>{{ r.message|linebreaksbr }}</p>
+  {% if r.open and case.status == 'info_requested' %}
+  <form method="post" action="{% url 'kyc:reply' case.token r.pk %}">{% csrf_token %}
+    <textarea name="reply" rows="2" placeholder="Your answer" required></textarea>
+    <button type="submit">Send answer</button>
+  </form>
+  {% elif r.reply %}<p><em>Your answer:</em> {{ r.reply|linebreaksbr }}</p>{% endif %}
+</article>
+{% endfor %}
+
+<progress value="{{ prog.done }}" max="{{ prog.total }}"></progress>
+<p>{{ prog.done }} of {{ prog.total }} required items done ({{ prog.percent }}%).</p>
+
+<table>
+  <thead><tr><th>Section</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  {% for sp in prog.sections %}
+    <tr>
+      <td>{{ sp.section.title }}{% if sp.section.party %} <small>({{ sp.section.party }})</small>{% endif %}</td>
+      <td>{% if sp.complete %}<span class="ok">Complete</span>{% else %}<span class="flag">{{ sp.missing|length }} missing</span>{% endif %}</td>
+      <td><a href="{% url 'kyc:section' case.token sp.section.key %}">{% if case.editable %}Fill in{% else %}View{% endif %}</a></td>
+    </tr>
+  {% endfor %}
+    <tr>
+      <td>Supporting documents</td>
+      <td>{% if prog.docs_missing %}<span class="flag">{{ prog.docs_missing|length }} missing</span>{% else %}<span class="ok">Complete</span>{% endif %}</td>
+      <td><a href="{% url 'kyc:docs' case.token %}">{% if case.editable %}Upload{% else %}View{% endif %}</a></td>
+    </tr>
+  </tbody>
+</table>
+
+{% if prog.missing %}
+<details><summary>What is still missing ({{ prog.missing|length }})</summary>
+  <ul>{% for m in prog.missing %}<li>{{ m }}</li>{% endfor %}</ul>
+</details>
+{% endif %}
+
+{% for event, t, why in actions %}
+<form method="post" action="{% url 'kyc:submit' case.token %}">{% csrf_token %}
+  <button type="submit" {% if why %}disabled{% endif %}>{{ t.label }}</button>
+  {% if why %}<small class="flag">{{ why }}</small>{% endif %}
+</form>
+{% empty %}
+<p>{% if case.status == 'approved' or case.status == 'rejected' %}This case is closed.{% else %}The case is with the reviewer; you will be asked here if anything else is needed.{% endif %}</p>
+{% endfor %}
+{% endblock %}

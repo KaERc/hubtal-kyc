@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}KYC cases{% endblock %}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.min.css">
+  <style>
+    .flag { color: var(--pico-del-color); font-weight: 600; }
+    .ok { color: var(--pico-ins-color); }
+    .badge { display: inline-block; padding: .1em .6em; border-radius: 1em; color: #fff; font-size: .8em; background: #6b7280; }
+    .badge.s-submitted, .badge.s-in_review { background: #2563eb; }
+    .badge.s-info_requested { background: #b45309; }
+    .badge.s-approved { background: #15803d; }
+    .badge.s-rejected { background: #b91c1c; }
+    nav form { margin: 0; }
+    dl.answers dt { font-weight: 600; margin-top: .6rem; }
+    dl.answers dd { margin: 0; }
+    td form, td p { margin: 0; }
+  </style>
+</head>
+<body>
+<header class="container">
+  <nav>
+    <ul><li><a href="{% url 'kyc:start' %}"><strong>KYC cases</strong></a></li></ul>
+  </nav>
+</header>
+<main class="container">
+  {% for m in messages %}<article {% if m.tags == 'error' %}class="flag"{% endif %}>{{ m }}</article>{% endfor %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

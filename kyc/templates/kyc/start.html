@@ -1,0 +1,17 @@
+{% extends "kyc/base.html" %}
+{% block content %}
+<h1>Start a KYC case</h1>
+<p>Choose the process that applies. You get a private link to the case; save it, it is the only way back in.</p>
+<div class="grid">
+  {% for flow in flows %}
+  <article>
+    <header><strong>{{ flow.title }}</strong></header>
+    <p>{{ flow.sections|length }} sections, {{ flow.docs|length }} documents.</p>
+    <form method="post">{% csrf_token %}
+      <input type="hidden" name="flow" value="{{ flow.key }}">
+      <button type="submit">Start this case</button>
+    </form>
+  </article>
+  {% endfor %}
+</div>
+{% endblock %}

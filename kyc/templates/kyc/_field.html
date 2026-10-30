@@ -1,0 +1,34 @@
+{% with f=b.f %}
+<div {% if f.show_if %}data-cond="{{ b.cond }}" data-prefix="{{ b.prefix }}"{% endif %} {% if not b.show %}hidden{% endif %}>
+{% if f.type == 'consent' %}
+  <label><input type="checkbox" name="{{ b.name }}" value="1" {% if b.value %}checked{% endif %} {% if b.error %}aria-invalid="true"{% endif %}> {{ f.label }}</label>
+{% elif f.type == 'yesno' %}
+  <fieldset>
+    <legend>{{ f.label }}{% if f.required %} *{% endif %}</legend>
+    {% for v, l in f.options %}<label><input type="radio" name="{{ b.name }}" value="{{ v }}" {% if b.value == v %}checked{% endif %}> {{ l }}</label>{% endfor %}
+  </fieldset>
+{% elif f.type == 'multiselect' %}
+  <fieldset>
+    <legend>{{ f.label }}{% if f.required %} *{% endif %}</legend>
+    {% for v, l in f.options %}<label><input type="checkbox" name="{{ b.name }}" value="{{ v }}" {% if v in b.value %}checked{% endif %}> {{ l }}</label>{% endfor %}
+  </fieldset>
+{% else %}
+  <label>{{ f.label }}{% if f.required %} *{% endif %}
+    {% if f.type == 'textarea' %}
+      <textarea name="{{ b.name }}" rows="3" {% if b.error %}aria-invalid="true"{% endif %}>{{ b.value|default_if_none:'' }}</textarea>
+    {% elif f.type == 'select' %}
+      <select name="{{ b.name }}" {% if b.error %}aria-invalid="true"{% endif %}>
+        <option value="">—</option>
+        {% for v, l in f.options %}<option value="{{ v }}" {% if b.value == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+      </select>
+    {% else %}
+      <input name="{{ b.name }}" value="{{ b.value|default_if_none:'' }}" {% if b.error %}aria-invalid="true"{% endif %}
+             type="{% if f.type == 'number' %}number{% elif f.type == 'text' %}text{% else %}{{ f.type }}{% endif %}"
+             {% if f.type == 'number' %}step="any" {% if f.min is not None %}min="{{ f.min }}"{% endif %} {% if f.max is not None %}max="{{ f.max }}"{% endif %}{% endif %}>
+    {% endif %}
+  </label>
+{% endif %}
+{% if f.help %}<small>{{ f.help }}</small>{% endif %}
+{% if b.error %}<small class="flag">{{ b.error }}</small>{% endif %}
+</div>
+{% endwith %}

@@ -2,7 +2,7 @@ import os
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import user_passes_test
 from django.db import transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
@@ -17,7 +17,7 @@ from .models import STATUS_LABELS, Case, Document, InfoRequest, ReviewNote
 MAGIC = {'.pdf': b'%PDF', '.jpg': b'\xff\xd8\xff', '.jpeg': b'\xff\xd8\xff', '.png': b'\x89PNG'}
 
 
-reviewer_only = staff_member_required(login_url='kyc:login')
+reviewer_only = user_passes_test(lambda u: u.is_active and u.is_staff, login_url='kyc:login')
 
 
 def client_ip(request):

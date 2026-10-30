@@ -8,6 +8,7 @@ from django.test import TestCase, override_settings
 
 from . import demo, engine, workflow
 from .flows import FLOWS
+from .flows.spec import Doc, Field, Flow, Section
 from .models import Case, Document, InfoRequest
 
 MEDIA = tempfile.mkdtemp()
@@ -210,3 +211,33 @@ class ViewTests(TestCase):
 
     def test_unknown_token_is_not_found(self):
         self.assertEqual(self.client.get('/c/nope/').status_code, 404)
+
+
+class FlowDefinitionTests(TestCase):
+    """A mistake in a new flow must fail when the flow is imported."""
+
+    def flow(self, **changes):
+        base = dict(key='t', version='1', country='XX', title='T', subject='a.n',
+                    sections=(Section('a', 'A', (Field('n', 'N'), Field('m', 'M', show_if=(('n', 'x'),)))),),
+                    docs=(Doc('d', 'D', show_if=(('a.n', 'x'),)),))
+        return Flow(**{**base, **changes})
+
+    def test_a_valid_flow_is_accepted(self):
+        self.flow()
+
+    def test_mistakes_are_rejected(self):
+        ok = Section('a', 'A', (Field('n', 'N'),))
+        cases = {
+            'unknown subject': dict(subject='a.nope'),
+            'subject in a repeat section': dict(sections=(Section('a', 'A', (Field('n', 'N'),), repeat=True),)),
+            'duplicate section': dict(sections=(ok, ok)),
+            'duplicate field': dict(sections=(Section('a', 'A', (Field('n', 'N'), Field('n', 'N again'))),)),
+            'condition on an unknown field': dict(sections=(Section('a', 'A', (Field('n', 'N', show_if=(('zz', 'x'),)),)),)),
+            'condition on a later field': dict(sections=(Section('a', 'A', (Field('n', 'N', show_if=(('m', 'x'),)), Field('m', 'M'))),)),
+            'document condition on an unknown field': dict(docs=(Doc('d', 'D', show_if=(('a.zz', 'x'),)),)),
+            'document condition without a section': dict(docs=(Doc('d', 'D', show_if=(('n', 'x'),)),)),
+            'duplicate document': dict(docs=(Doc('d', 'D'), Doc('d', 'D again'))),
+        }
+        for name, changes in cases.items():
+            with self.subTest(name), self.assertRaises(ValueError):
+                self.flow(**changes)

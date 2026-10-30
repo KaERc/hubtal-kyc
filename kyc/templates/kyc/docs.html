@@ -21,10 +21,13 @@
       </td>
       <td>
         {% if case.editable %}
+        {# The native file input is hidden: it would say "No file chosen" next to a file that is already uploaded, and browsers restore its state on Back. Choosing a file uploads it at once. #}
         <form method="post" enctype="multipart/form-data">{% csrf_token %}
           <input type="hidden" name="key" value="{{ d.key }}">
-          <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required>
-          <button type="submit">Upload</button>
+          <label role="button" class="secondary">{% if files %}Add another{% else %}Upload{% endif %}
+            <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" autocomplete="off" hidden onchange="this.form.submit()">
+          </label>
+          <noscript><button type="submit">Send the chosen file</button></noscript>
         </form>
         {% endif %}
       </td>

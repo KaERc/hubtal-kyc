@@ -18,10 +18,10 @@ uv run python manage.py runserver
 `seed` creates the demo reviewer account and three demo cases, and prints the login and the case links.
 
 - Applicant side: <http://127.0.0.1:8000/> — pick a flow, fill in the sections, upload documents, submit.
-- Reviewer side: <http://127.0.0.1:8000/review/> — sign in with the demo account that `seed` prints
-  (username `reviewer`). `seed` prints the password only the first time it creates the account; after that read the default in
-  `kyc/management/commands/seed.py` or set your own with `uv run python manage.py changepassword reviewer`. Demo account only;
-  `KYC_DEMO_PASSWORD` overrides the default.
+- Reviewer side: <http://127.0.0.1:8000/review/> — sign in with username `reviewer` and password `reviewer`. This is a demo
+  account for running the prototype locally. `seed` prints the login on every run and resets the account to it, so running `seed`
+  again always fixes a forgotten password. To choose your own, run `uv run python manage.py changepassword reviewer`, or set
+  `KYC_DEMO_PASSWORD` before `seed`.
 - Tests: `uv run python manage.py test`
 
 State is a local SQLite file (`db.sqlite3`) and uploaded files in `media/`; both are git-ignored.
@@ -29,8 +29,8 @@ Delete them and run `migrate` again to reset. The page styling loads Pico CSS fr
 
 ### A two-minute tour
 
-1. **Answer a reviewer's question.** `seed` prints three numbered links, one per demo case (it only runs on an empty
-   database; to get the links again, delete `db.sqlite3` and `media/`, run `migrate`, then `seed`). Open **link 2** (*EOR, question
+1. **Answer a reviewer's question.** `seed` prints three numbered links, one per demo case (on a database that
+   already has cases it lists their links instead; for fresh demo cases delete `db.sqlite3` and `media/`, run `migrate`, then `seed`). Open **link 2** (*EOR, question
    open*). At the top of the page is a box *Question from the reviewer* about a bankruptcy answer. Type a reply, click
    **Send answer**, then click **Send answers back to review**.
 2. **See it as the reviewer.** Go to <http://127.0.0.1:8000/review/> and sign in. The list shows each case with its
@@ -209,6 +209,7 @@ out of scope entirely is in the previous section.
 | `config/settings.py` database | SQLite | One file, one process | Deployment: PostgreSQL |
 | `config/settings.py` environment | Settings read from the environment by hand | No typing or validation (`KYC_DEBUG` is on only for the string `1`) | More settings appear: `pydantic-settings` |
 | `kyc/engine.py` `PHONE` | A loose phone pattern, countries as free text | Accepts numbers nobody can call; "Estonia" and "EE" are different answers | Data quality starts to matter: `phonenumbers` and a country list |
+| `config/settings.py` `DEMO_REVIEWER` | A fixed demo reviewer login, reset by `seed` on every run and written in this README | Anyone who knows it can sign in as a reviewer on any instance where `seed` ran | Before any real use: delete the account and the reset, create reviewers by invitation |
 | `kyc/templates/kyc/base.html` | Stylesheet from a CDN | The first load needs internet; no integrity hash | Production: vendor the file or build the CSS, add an integrity hash |
 | `kyc/templates/kyc/base.html` script | Forms are posted with `fetch` and the page body is swapped in place | Focus and the open state of `<details>` are lost on a swap; needs `FormData(form, submitter)` (browsers from 2023), otherwise the native post runs | More interactivity is needed: htmx, or server-rendered fragments |
 

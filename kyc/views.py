@@ -1,5 +1,7 @@
-from django.contrib import messages
+import os
+
 from django.conf import settings
+from django.contrib import messages
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -8,6 +10,9 @@ from django.views.decorators.http import require_http_methods, require_POST
 from . import engine, workflow
 from .flows import FLOWS
 from .models import Case, Document, InfoRequest
+
+# What an upload must start with, per extension; the extension alone proves nothing.
+MAGIC = {'.pdf': b'%PDF', '.jpg': b'\xff\xd8\xff', '.jpeg': b'\xff\xd8\xff', '.png': b'\x89PNG'}
 
 
 def client_ip(request):
@@ -111,3 +116,56 @@ def section(request, token, key):
                     b['value'] = request.POST.get(b['name'])
         messages.error(request, 'Some answers were not saved, see the marked fields.')
     return render(request, 'kyc/section.html', {'case': case, 's': s, 'forms': forms})
+
+
+def upload_error(up):
+    ext = os.path.splitext(up.name)[1].lower()
+    if ext not in MAGIC:
+        return 'Only PDF, JPG and PNG files are accepted.'
+    if up.size > settings.MAX_UPLOAD_BYTES:
+        return 'The file is larger than 10 MB.'
+    head = up.read(8)
+    up.seek(0)
+    if not head.startswith(MAGIC[ext]):
+        return 'The file content does not match its type.'
+
+
+def docs(request, token):
+    case = case_by_token(token)
+    wanted = engine.active_docs(case.flow, case.data)
+    if request.method == 'POST':
+        doc = next((d for d in wanted if d.key == request.POST.get('key')), None)
+        up = request.FILES.get('file')
+        if not case.editable:
+            messages.error(request, 'This case is locked while it is with the reviewer.')
+        elif not doc or not up:
+            messages.error(request, 'Choose a file to upload.')
+        elif error := upload_error(up):
+            messages.error(request, error)
+        else:
+            Document.objects.create(case=case, key=doc.key, file=up, name=os.path.basename(up.name)[:255])
+            messages.success(request, f'Uploaded: {doc.label}.')
+        return redirect('kyc:docs', token=token)
+    have = {}
+    for d in case.documents.all():
+        have.setdefault(d.key, []).append(d)
+    return render(request, 'kyc/docs.html', {'case': case, 'rows': [(d, have.get(d.key, [])) for d in wanted]})
+
+
+@require_POST
+def doc_delete(request, token, pk):
+    case = case_by_token(token)
+    doc = get_object_or_404(Document, pk=pk, case=case)
+    if case.editable:
+        doc.file.delete(save=False)
+        doc.delete()
+    return redirect('kyc:docs', token=token)
+
+
+def send(doc):
+    """Always as an attachment: an uploaded file is never rendered by the browser in our origin."""
+    return FileResponse(doc.file.open('rb'), as_attachment=True, filename=doc.name)
+
+
+def download(request, token, pk):
+    return send(get_object_or_404(Document, pk=pk, case__token=token))

@@ -1,0 +1,35 @@
+{% extends "kyc/base.html" %}
+{% block title %}Supporting documents{% endblock %}
+{% block content %}
+<p><a href="{% url 'kyc:case' case.token %}">← Back to the case</a></p>
+<h1>Supporting documents</h1>
+<p>PDF, JPG or PNG, up to 10 MB each. Documents that are not required still help the reviewer.</p>
+<table>
+  <thead><tr><th>Document</th><th>Uploaded</th><th></th></tr></thead>
+  <tbody>
+  {% for d, files in rows %}
+    <tr>
+      <td>{{ d.label }}{% if d.required %} *{% endif %}{% if d.help %}<br><small>{{ d.help }}</small>{% endif %}</td>
+      <td>
+        {% for f in files %}
+          <div><a href="{% url 'kyc:download' case.token f.pk %}">{{ f.name }}</a>
+            {% if case.editable %}
+            <form method="post" action="{% url 'kyc:doc_delete' case.token f.pk %}" style="display:inline">{% csrf_token %}
+              <button type="submit" class="outline secondary" style="padding:0 .5em">Remove</button>
+            </form>{% endif %}</div>
+        {% empty %}{% if d.required %}<span class="flag">Missing</span>{% else %}—{% endif %}{% endfor %}
+      </td>
+      <td>
+        {% if case.editable %}
+        <form method="post" enctype="multipart/form-data">{% csrf_token %}
+          <input type="hidden" name="key" value="{{ d.key }}">
+          <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required>
+          <button type="submit">Upload</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
